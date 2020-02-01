@@ -1,0 +1,12 @@
+#directories to ignore
+
+## general ignores
+**/__pycache__/
+*.npy
+*.npz
+*.png
+*.log
+*.bin
+~
+~
+
