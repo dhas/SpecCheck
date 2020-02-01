@@ -135,34 +135,3 @@ class SpecDraw:
 				np.save(class_dir/('%d.npy' % j),shape)
 		np.save(self.dataset/'labels.npy',y_draw)
 		self._save_settings()
-	
-
-	def get_loaders(self,train_batch_size,validation_batch_size,
-		train_set_proportion=0.8,
-		train_set_shuffle=True,validation_set_shuffle=False,
-		transforms=None):
-		
-		if transforms is None:
-			dataset = DatasetFolder(root=str(self.dataset),
-				loader=npy_loader,
-				extensions='.npy')
-		else:
-			dataset = DatasetFolder(root=str(self.dataset),
-				loader=npy_loader,
-				extensions='.npy',
-				transform=transforms)
-
-		total_num_imgs = self.num_classes*self.num_imgs_per_class
-		train_size = int(train_set_proportion * total_num_imgs)
-		val_size   = total_num_imgs - train_size
-		train_ds,val_ds = random_split(dataset,[train_size,val_size])
-
-		train_loader = DataLoader(dataset=train_ds,
-			batch_size=train_batch_size,
-			shuffle=train_set_shuffle)
-		
-		val_loader = DataLoader(dataset=val_ds,
-			batch_size=validation_batch_size,
-			shuffle=validation_set_shuffle)
-		
-		return train_loader,val_loader

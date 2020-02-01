@@ -5,24 +5,6 @@ from pathlib import Path
 from tqdm import tqdm
 from .quickdraw_bin_parser import unpack_drawings,vector_to_raster
 
-#------------------ general utils ---------------------
-def plot_batch(tensor_batch,labels,num_rows,savename):
-	np_batch = tensor_batch.numpy()
-	num_cols = tensor_batch.shape[0] // num_rows
-	side  	 = tensor_batch.shape[1]
-	channels = tensor_batch.shape[3]
-	if channels == 1:
-		np_batch = np_batch.reshape(num_rows,num_cols,side,side)
-	else:
-		np_batch = np_batch.reshape(num_rows,num_cols,side,side,channels)
-	labels   = labels.reshape(num_rows,num_cols,1)
-	utils.plot_examples(np_batch,savename,labels=labels)
-
-
-
-
-
-#------------------ doodle dataset ---------------------
 class QuickDraw():
 
 	def __init__(self,root_dir,side,num_imgs_per_class):
@@ -74,7 +56,6 @@ class QuickDraw():
 		for i in tqdm(range(num_imgs)):
 			img = vector_to_raster([vector_images[rand_idx[i]]],side=side)[0]
 			img = img.reshape(side,side,1)
-			# img = utils.replicate_channels(img)
 			np.save(dir/('%d.npy' % i),img)
 
 
@@ -94,56 +75,3 @@ class QuickDraw():
 				self.img_side)
 			print('')
 		self._save_settings()
-
-
-
-
-
-
-# if __name__ == '__main__':
-
-	
-	# qd10 = QuickDraw('./qd_10',side=side,num_imgs_per_class=1200)	
-	# train_loader,val_loader = qd10.get_loaders(16,16)
-
-	# for batch in train_loader:
-	# 	x,y = batch
-	# 	labels = np.array([train_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,qd10.root_dir/'train_examples.png')
-	# 	break
-
-	# for batch in val_loader:
-	# 	x,y = batch
-	# 	labels = np.array([val_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,qd10.root_dir/'validation_examples.png')
-	# 	break
-
-
-	# train_loader,val_loader = qdshapes.get_loaders(16,16)
-	# for batch in train_loader:
-	# 	x,y = batch
-	# 	labels = np.array([train_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,qdshapes.root_dir/'train_examples.png')
-	# 	break
-
-	# for batch in val_loader:
-	# 	x,y = batch
-	# 	labels = np.array([val_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,qdshapes.root_dir/'validation_examples.png')
-	# 	break
-
-	# sdshapes = SpecDraw('./sd_shapes',side=side)
-	# sdshapes.draw_dataset()
-	# train_loader,val_loader = sdshapes.get_loaders(16,16)
-	# for batch in train_loader:
-	# 	x,y = batch
-	# 	labels = np.array([train_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,sdshapes.root_dir/'train_examples.png')
-	# 	break
-
-	# for batch in val_loader:
-	# 	x,y = batch
-	# 	labels = np.array([val_loader.dataset.dataset.classes[l] for l in y])
-	# 	QuickDraw.plot_batch(x,labels,2,sdshapes.root_dir/'validation_examples.png')
-	# 	break
-
