@@ -1,4 +1,4 @@
 # SpecCheck
 
 ## Setup
-1. run prepare_datasets.py and follow instructions
+1. Run prepare_datasets.py and follow instructions
