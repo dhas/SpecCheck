@@ -5,8 +5,8 @@ import torch
 from torch import nn, optim
 import torchvision.transforms as transforms
 from torchsummary import summary
-from encoder.encoder import Encoder
-from encoder.train import EncoderTrainer, EncoderTester, OODEvaluator
+from ood.encoder import Encoder
+from ood.train import EncoderTrainer, EncoderTester, OODEvaluator
 from utils import train_utils
 from utils import other_utils
 
