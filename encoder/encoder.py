@@ -4,56 +4,79 @@ from torch import nn, optim
 import torch.nn.functional as F
 
 class Encoder(nn.Module):	
-	def __init__(self, net_name, input_dim, net_cfg, num_classes, dropout_rate, FC_size, norm_type='bn'):
+	def __init__(self, net_name, input_dim, net_cfg, num_classes):
 		super(Encoder, self).__init__()
 		self.net_name = net_name		
-		self.features = self._make_layers(net_cfg,norm_type)
+		self.head = self._make_head(net_cfg['head'])
 		
-		net_cfg = np.array(net_cfg)
-		num_pools = len(np.where(net_cfg == 'M')[0])		
+		net_cfg_arr = np.array(net_cfg['head'])
+		num_pools = len(np.where(net_cfg_arr == 'M')[0])		
 		_f_dims = input_dim // (2**num_pools)		
-		_f_channels = int(net_cfg[net_cfg != 'M'][-1])
+		_f_channels = int(net_cfg_arr[net_cfg_arr != 'M'][-1])
+
+		self.tail = self._make_tail(net_cfg['tail'],
+				_f_channels*_f_dims*_f_dims,
+				num_classes)
 		
-		if dropout_rate > 0:
-			self.classifier = nn.Sequential(
-				nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
-				nn.ReLU(True),
-				nn.Dropout(p=dropout_rate),
-				nn.Linear(FC_size, FC_size),
-				nn.ReLU(True),
-				nn.Dropout(p=dropout_rate),
-				nn.Linear(FC_size, num_classes))
-		else:
-			self.classifier = nn.Sequential(
-				nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
-				nn.ReLU(True),				
-				nn.Linear(FC_size, FC_size),
-				nn.ReLU(True),				
-				nn.Linear(FC_size, num_classes))
+		# if dropout_rate > 0:
+		# 	self.classifier = nn.Sequential(
+		# 		nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
+		# 		nn.ReLU(True),
+		# 		nn.Dropout(p=dropout_rate),
+		# 		nn.Linear(FC_size, FC_size),
+		# 		nn.ReLU(True),
+		# 		nn.Dropout(p=dropout_rate),
+		# 		nn.Linear(FC_size, num_classes))
+		# else:
+		# 	self.classifier = nn.Sequential(
+		# 		nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
+		# 		nn.ReLU(True),				
+		# 		nn.Linear(FC_size, FC_size),
+		# 		nn.ReLU(True),				
+		# 		nn.Linear(FC_size, num_classes))
 
 
-	def _make_layers(self, cfg, norm_type):
+	def _make_tail(self, cfg, in_channels, num_classes):
+		layers = []
+		for x in cfg:
+			if x.startswith('D#'):
+				dropout_rate = float(x.split('#')[-1])
+				layers += [nn.Dropout(p=dropout_rate)]
+			else:				
+				layers += [nn.Linear(in_channels, int(x)),
+						   nn.ReLU(True)]
+			in_channels = int(x)
+		layers += [nn.Linear(in_channels, num_classes)]
+		return nn.Sequential(*layers)
+
+
+	def _make_head(self, cfg):
 		layers = []
 		in_channels = 1
 		for x in cfg:
 			if x == 'M':
 				layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
 			else:
-				if 'bn' == 'norm_type':
-					layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
-							nn.BatchNorm2d(x),
-							nn.ReLU(inplace=True)]
-				else:
-					layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),							
-							nn.ReLU(inplace=True)]
-				in_channels = x
+				block_cfg = x.split('#')
+				out_channels = int(block_cfg[0])
+				block_layers = [nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)]
+				
+				if len(block_cfg) > 1:
+					if block_cfg[1] == 'BN':
+						block_layers += [nn.BatchNorm2d(out_channels)]
+					
+				block_layers += [nn.ReLU(inplace=True)]
+				layers += block_layers					
+				in_channels = out_channels
+
 		layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
 		return nn.Sequential(*layers)
 
 	def forward(self, x):
-		out = self.features(x)        
+		out = self.head(x)        
 		out = torch.flatten(out,1)
-		out = self.classifier(out)
+		# out = self.classifier(out)
+		out = self.tail(out)
 		return out
 
 	def evaluate(self,x):

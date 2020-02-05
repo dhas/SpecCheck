@@ -18,22 +18,23 @@ def read_settings(settings):
 	else:
 		return {}
 
+def training_necessary(checkpoint_path,cfg,cfg_path):	
+	training_needed = (not checkpoint_path.exists()) or \
+		(cfg != pickle.load(open(cfg_path,'rb')))
+	return training_needed
+
 cfg = {
-	
-	'NET01' : [4,'M']
+		
+	'NET01' : {'head'  :['4','M'],
+			   'tail'  :['4','4'],
+			   'optim' :optim.RMSprop,
+			  }
 	# 'VGG05': [64, 'M', 128, 'M'],
 	# 'VGG07': [64, 'M', 128, 'M', 256, 256, 'M'],
 	# 'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 	# 'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
 	# 'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
 	# 'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
-}
-
-fc = {
-	'NET01': 4,
-	'VGG05': 512,
-	'VGG07': 1024,
-	'VGG11': 1024,
 }
 
 
@@ -46,15 +47,10 @@ dataset_settings = read_settings(dataset_dir/'settings.json')
 
 model_settings = {
 	'img_side'     	: dataset_settings['img_side'],
-	'num_classes'  	: dataset_settings['num_classes'],
-	'dropout_rate' 	: 0,
-	'norm_type' 	: 'none',
-	'learning_rate'	: 0.01,
-	'momentum'		: 0.85,
+	'num_classes'  	: dataset_settings['num_classes'],	
 }
 
 input_shape = (1,model_settings['img_side'],model_settings['img_side'])
-
 
 
 training_settings = {
@@ -68,14 +64,11 @@ trans = transforms.Compose([
 criterion = nn.CrossEntropyLoss()
 
 device = torch.device('cuda')
-for net_name in list(cfg.keys()):
+for net_name in list(cfg.keys()):	
 	encoder = Encoder(net_name,
 		model_settings['img_side'],
 		cfg[net_name],
-		model_settings['num_classes'],
-		model_settings['dropout_rate'],
-		fc[net_name],
-		norm_type=model_settings['norm_type'])
+		model_settings['num_classes'])
 	encoder.to(device)
 	summary(encoder,input_shape)
 
@@ -84,31 +77,33 @@ for net_name in list(cfg.keys()):
 		training_settings['batch_size'],
 		transforms=trans)
 
-	optimizer = optim.SGD(encoder.parameters(), 
-		lr=model_settings['learning_rate'], 
-		momentum=model_settings['momentum'])
+	optimizer = cfg[net_name]['optim'](encoder.parameters())
 
 	train_params = {
-		'savedir': encoders_root/net_name,
-		'model_name':('%s.tar' % net_name),
-		'epochs':1,
-		'log_interval': 20,
-		'batch_size': 32,     
+		'savedir'		: encoders_root/net_name,		
+		'epochs'		: 1,
+		'log_interval'	: 20,
+		'batch_size'	: 32,     
 	}
 
 	train_params['savedir'].mkdir(exist_ok=True)
-
-	checkpoint_path = train_params['savedir']/train_params['model_name']
-	if not checkpoint_path.exists():
+	checkpoint_path = train_params['savedir']/('%s.tar' % net_name)
+	cfg_path        = train_params['savedir']/('%s.pkl' % net_name)
+	
+	# if not checkpoint_path.exists():
+	if training_necessary(checkpoint_path,cfg[net_name],cfg_path):
 		trainer = EncoderTrainer(encoder,device,
 				train_loader,val_loader,
 				criterion,optimizer,
 				train_params)
-		trainer.fit()
-	
-	# tester = EncoderTester(encoder,device,checkpoint_path)
-	# loss,accuracy = tester.evaluate(device,criterion,val_loader)
-	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+		trainer.fit(checkpoint_path)
+		
+		pickle.dump(cfg[net_name],open(cfg_path,'wb'))
+
+		print('')
+		tester = EncoderTester(encoder,device,checkpoint_path)
+		loss,accuracy = tester.evaluate(device,criterion,val_loader)
+		print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
 	specset_dir = Path('./datasets/sd_shapes/dataset')
 	spec_loader = train_utils.get_npy_dataloader(specset_dir,
@@ -116,7 +111,8 @@ for net_name in list(cfg.keys()):
 		transforms=trans)
 	
 	ood_eval = OODEvaluator(encoder,device,checkpoint_path)
-	print('OOD evaluation')
+	
+	print('\nOOD evaluation')
 	loss,accuracy,ood_npys = ood_eval.evaluate(device,criterion,spec_loader)
 	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
 	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)

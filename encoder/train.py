@@ -120,9 +120,8 @@ class EncoderTrainer:
 	    val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
 	    self._log_validation(val_loss,correct,total,accuracy,end='\n')
 
-	def fit(self):
-		model_savepath = self.params['savedir']/('%s' % self.params['model_name'])
-		
+	def fit(self,checkpoint_path):
+			
 		for epoch in range(1, self.params['epochs'] + 1):
 			self._train_epoch(self.model, self.device, 
 				self.train_loader, self.val_loader, 
@@ -132,7 +131,7 @@ class EncoderTrainer:
 			torch.save({'epoch': epoch,
 				'model_state_dict': self.model.state_dict(),
 				'optimizer_state_dict': self.optimizer.state_dict()},
-				model_savepath)
+				checkpoint_path)
 
 class EncoderTester:
 	def __init__(self,model,device,checkpoint_path):
