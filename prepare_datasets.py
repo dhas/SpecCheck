@@ -67,7 +67,7 @@ if __name__ == '__main__':
 		'th' 	: 1
 	}
 
-	plots_dir = Path('./plots')
+	plots_dir = Path('./_plots')
 	plots_dir.mkdir(exist_ok=True)
 
 	qd_shapes_root = Path('./datasets/qd_shapes')

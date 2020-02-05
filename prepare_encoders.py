@@ -6,7 +6,7 @@ from torch import nn, optim
 import torchvision.transforms as transforms
 from torchsummary import summary
 from encoder.encoder import Encoder
-from encoder.train import EncoderTrainer, EncoderTester, IDEvaluator
+from encoder.train import EncoderTrainer, EncoderTester, OODEvaluator
 from utils import train_utils
 from utils import other_utils
 
@@ -37,7 +37,7 @@ fc = {
 }
 
 
-encoders_root = Path('./encoders')
+encoders_root = Path('./_encoders')
 encoders_root.mkdir(exist_ok=True)
 
 
@@ -115,10 +115,11 @@ for net_name in list(cfg.keys()):
 		100,
 		transforms=trans)
 	
-	id_eval = IDEvaluator(encoder,device,checkpoint_path)
-	loss,accuracy,id_npys = id_eval.evaluate(device,criterion,spec_loader)
+	ood_eval = OODEvaluator(encoder,device,checkpoint_path)
+	print('OOD evaluation')
+	loss,accuracy,ood_npys = ood_eval.evaluate(device,criterion,spec_loader)
 	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
-	misses_dict = other_utils.paths_to_indexes(id_npys,spec_loader.dataset.classes)
+	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
 	print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 	other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
 		labels_dict,

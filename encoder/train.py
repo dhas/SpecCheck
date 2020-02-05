@@ -161,7 +161,7 @@ class EncoderTester:
 			accuracy = 100. * correct / length
 		return loss,accuracy
 
-class IDEvaluator:
+class OODEvaluator:
 	def __init__(self,model,device,checkpoint_path):
 		checkpoint = torch.load(checkpoint_path)
 		model.load_state_dict(checkpoint['model_state_dict'])
@@ -180,7 +180,7 @@ class IDEvaluator:
 		correct = 0
 		nbatches = 0
 		length = 0
-		id_npys = np.array([])
+		ood_npys = np.array([])
 		with torch.no_grad():
 			for batch_idx, (data, target, fnames) in enumerate(tqdm(test_loader)):
 				data, target = data.to(device), target.to(device)
@@ -189,11 +189,11 @@ class IDEvaluator:
 				pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
 				
 				hits = pred.eq(target.view_as(pred))				
-				id_npys = np.concatenate([id_npys,self.get_batch_ids(fnames,hits)])				
+				ood_npys = np.concatenate([ood_npys,self.get_batch_ids(fnames,hits)])				
 				correct += hits.sum().item()
 				length += len(data)
 				nbatches += 1				
 			
 			loss /= nbatches
 			accuracy = 100. * correct / length
-		return loss,accuracy,id_npys
+		return loss,accuracy,ood_npys
