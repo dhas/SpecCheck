@@ -26,9 +26,28 @@ def training_necessary(checkpoint_path,cfg,cfg_path):
 cfg = {
 		
 	'NET01' : {'head'  :['4','M'],
-			   'tail'  :['4','4'],
-			   'optim' :optim.RMSprop,
-			  }
+			   'tail'  :['4'],			   
+			   'trn'   :{
+							'optim'	: optim.RMSprop,
+							'lr'	: 1e-4,			   				
+						},
+			  },
+
+	'NET02' : {'head'  :['32', 'M', '64', 'M'],
+			   'tail'  :['128'],
+			   'trn'   :{
+							'optim'	: optim.Adam,
+							'lr'	: 1e-4,			   				
+						},
+			  },
+
+	'NET03' : {'head'  :['32', 'M', '64', 'M'],
+			   'tail'  :['128', 'D#0.5'],
+			   'trn'   :{
+							'optim'	: optim.Adam,
+							'lr'	: 1e-4,			   				
+						},
+			  },
 	# 'VGG05': [64, 'M', 128, 'M'],
 	# 'VGG07': [64, 'M', 128, 'M', 256, 256, 'M'],
 	# 'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -65,20 +84,7 @@ criterion = nn.CrossEntropyLoss()
 
 device = torch.device('cuda')
 for net_name in list(cfg.keys()):	
-	encoder = Encoder(net_name,
-		model_settings['img_side'],
-		cfg[net_name],
-		model_settings['num_classes'])
-	encoder.to(device)
-	summary(encoder,input_shape)
-
-	train_loader,val_loader = train_utils.get_npy_train_loader(dataset_dir,
-		training_settings['batch_size'],
-		training_settings['batch_size'],
-		transforms=trans)
-
-	optimizer = cfg[net_name]['optim'](encoder.parameters())
-
+	
 	train_params = {
 		'savedir'		: encoders_root/net_name,		
 		'epochs'		: 1,
@@ -89,9 +95,27 @@ for net_name in list(cfg.keys()):
 	train_params['savedir'].mkdir(exist_ok=True)
 	checkpoint_path = train_params['savedir']/('%s.tar' % net_name)
 	cfg_path        = train_params['savedir']/('%s.pkl' % net_name)
-	
-	# if not checkpoint_path.exists():
-	if training_necessary(checkpoint_path,cfg[net_name],cfg_path):
+		
+	if not training_necessary(checkpoint_path,cfg[net_name],cfg_path):
+		print('Encoder %s already trained' % net_name)
+	else:
+		print('Training encoder %s' % net_name)
+		encoder = Encoder(net_name,
+			model_settings['img_side'],
+			cfg[net_name],
+			model_settings['num_classes'])
+		encoder.to(device)
+		summary(encoder,input_shape)
+
+		train_loader,val_loader = train_utils.get_npy_train_loader(dataset_dir,
+			training_settings['batch_size'],
+			training_settings['batch_size'],
+			transforms=trans)
+
+		optimizer = cfg[net_name]['trn']['optim'](encoder.parameters(),
+				lr = cfg[net_name]['trn']['lr'])
+
+
 		trainer = EncoderTrainer(encoder,device,
 				train_loader,val_loader,
 				criterion,optimizer,
@@ -105,19 +129,19 @@ for net_name in list(cfg.keys()):
 		loss,accuracy = tester.evaluate(device,criterion,val_loader)
 		print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
-	specset_dir = Path('./datasets/sd_shapes/dataset')
-	spec_loader = train_utils.get_npy_dataloader(specset_dir,
-		100,
-		transforms=trans)
-	
-	ood_eval = OODEvaluator(encoder,device,checkpoint_path)
-	
-	print('\nOOD evaluation')
-	loss,accuracy,ood_npys = ood_eval.evaluate(device,criterion,spec_loader)
-	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
-	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
-	print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
-	other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
-		labels_dict,
-		model_settings['img_side'],
-		misses_dict=misses_dict)
+		specset_dir = Path('./datasets/sd_shapes/dataset')
+		spec_loader = train_utils.get_npy_dataloader(specset_dir,
+			100,
+			transforms=trans)
+		
+		ood_eval = OODEvaluator(encoder,device,checkpoint_path)
+		
+		print('\nOOD evaluation')
+		loss,accuracy,ood_npys = ood_eval.evaluate(device,criterion,spec_loader)
+		labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
+		misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
+		print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+		other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
+			labels_dict,
+			model_settings['img_side'],
+			misses_dict=misses_dict)

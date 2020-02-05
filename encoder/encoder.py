@@ -17,24 +17,6 @@ class Encoder(nn.Module):
 		self.tail = self._make_tail(net_cfg['tail'],
 				_f_channels*_f_dims*_f_dims,
 				num_classes)
-		
-		# if dropout_rate > 0:
-		# 	self.classifier = nn.Sequential(
-		# 		nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
-		# 		nn.ReLU(True),
-		# 		nn.Dropout(p=dropout_rate),
-		# 		nn.Linear(FC_size, FC_size),
-		# 		nn.ReLU(True),
-		# 		nn.Dropout(p=dropout_rate),
-		# 		nn.Linear(FC_size, num_classes))
-		# else:
-		# 	self.classifier = nn.Sequential(
-		# 		nn.Linear(_f_channels*_f_dims*_f_dims, FC_size),
-		# 		nn.ReLU(True),				
-		# 		nn.Linear(FC_size, FC_size),
-		# 		nn.ReLU(True),				
-		# 		nn.Linear(FC_size, num_classes))
-
 
 	def _make_tail(self, cfg, in_channels, num_classes):
 		layers = []
@@ -45,7 +27,7 @@ class Encoder(nn.Module):
 			else:				
 				layers += [nn.Linear(in_channels, int(x)),
 						   nn.ReLU(True)]
-			in_channels = int(x)
+				in_channels = int(x)
 		layers += [nn.Linear(in_channels, num_classes)]
 		return nn.Sequential(*layers)
 
@@ -68,14 +50,12 @@ class Encoder(nn.Module):
 				block_layers += [nn.ReLU(inplace=True)]
 				layers += block_layers					
 				in_channels = out_channels
-
-		layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+						
 		return nn.Sequential(*layers)
 
 	def forward(self, x):
 		out = self.head(x)        
 		out = torch.flatten(out,1)
-		# out = self.classifier(out)
 		out = self.tail(out)
 		return out
 
