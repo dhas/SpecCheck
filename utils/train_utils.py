@@ -4,12 +4,50 @@ import torch
 from torchvision.datasets import DatasetFolder
 from torch.utils.data import DataLoader,random_split
 
+
+class DrawDataset(DatasetFolder):	
+
+	def __getitem__(self,index):		
+		path, target = self.samples[index]
+		sample = self.loader(path)
+		if self.transform is not None:
+			sample = self.transform(sample)
+		if self.target_transform is not None:
+			target = self.target_transform(target)
+
+		return sample, target, path
+
+
+
+
 def npy_loader(path):
 	img = torch.from_numpy(np.load(path))
 	return img
 
 
 def get_npy_dataloader(dataset_root,
+		batch_size,
+		shuffle=True,
+		transforms=None):
+	
+	if transforms is None:
+		dataset = DrawDataset(root=dataset_root,
+			loader=npy_loader,
+			extensions='.npy')
+	else:
+		dataset = DrawDataset(root=dataset_root,
+			loader=npy_loader,
+			extensions='.npy',
+			transform=transforms)		
+
+	dataloader = DataLoader(dataset=dataset,
+		batch_size=batch_size,
+		shuffle=shuffle)
+
+	return dataloader
+
+
+def get_npy_train_loader(dataset_root,
 		train_batch_size,
 		validation_batch_size,
 		train_set_proportion=0.8,

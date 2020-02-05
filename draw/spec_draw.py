@@ -3,26 +3,22 @@ import cv2
 from pathlib import Path
 import shutil
 import json
+import pickle
 from tqdm import tqdm
 
 
 class SpecDraw:
-	def __init__(self,root_dir,side,num_imgs_per_class):
+	def __init__(self,root_dir,side,num_imgs_per_class,draw_limits):
 		self.root_dir = Path(root_dir)
 		self.root_dir.mkdir(exist_ok=True)
 		self.dataset  = self.root_dir / 'dataset'
 		self.settings = self.dataset / 'settings.json'
+		self.labels = self.dataset / 'labels.pkl'
 		self.num_imgs_per_class = num_imgs_per_class
 		self.img_side = side
 		self.class_names  = ['circle', 'square']
 		self.num_classes = len(self.class_names)
-		self.draw_limits = {
-			'sz_hi' : (self.img_side/2) - 10,
-			'sz_lo' : (self.img_side/2) // 2 - 10,
-			'br_lo' : 100,
-			'br_hi' : 255,
-			'th' 	: 5
-		}
+		self.draw_limits = draw_limits
 
 		if self._settings_changed():
 			self._draw_dataset()
@@ -62,6 +58,49 @@ class SpecDraw:
 	#static method
 	def draw_shape(shape,x,y,r,br,t,side):
 
+		def _circle_bresenham(xm,ym,r,br,side):
+			canvas = np.zeros(shape=(side,side))
+			x = -r; y = 0; err = 2-2*r #II. Quadrant
+			while True:		
+				canvas[xm-x, ym+y] = br # I. Quadrant
+				canvas[xm-y, ym-x] = br # II. Quadrant
+				canvas[xm+x, ym-y] = br # III. Quadrant
+				canvas[xm+y, ym+x] = br # IV. Quadrant
+				r = err
+				if (r<=y):
+					y += 1
+					err += y*2+1
+				if (r > x) or (err > y): 
+					x += 1
+					err += x*2+1
+				if x>0:
+					break
+			return canvas
+
+		def _square_bresenham(x0,y0,r,br,side):
+			def _line_bresenham(canvas,x0,y0,x1,y1,br):    
+				dx = np.abs(x1-x0)
+				sx = 1 if x0<x1 else -1
+				dy = -1*np.abs(y1-y0)
+				sy = 1 if y0<y1 else -1
+				err = dx+dy
+				while True:
+					canvas[x0,y0] = br
+					if (x0==x1 and y0==y1):
+						break
+					e2 = 2*err
+					if (e2 >= dy):
+						err=err+dy; x0=x0+sx
+					if (e2 <=dx):
+						err=err+dx; y0=y0+sy
+			canvas = np.zeros(shape=(side,side))
+			_line_bresenham(canvas,x0,y0,x0,y0+r,br)
+			_line_bresenham(canvas,x0,y0,x0+r,y0,br)
+			_line_bresenham(canvas,x0+r,y0,x0+r,y0+r,br)
+			_line_bresenham(canvas,x0,y0+r,x0+r,y0+r,br)
+			return canvas
+
+
 		def _circle_opencv(xm,ym,r,br,t,side):
 			canvas = np.zeros(shape=(side,side))	
 			img = cv2.circle(canvas,(xm,ym),r,int(br),t)
@@ -72,11 +111,18 @@ class SpecDraw:
 			img    = cv2.rectangle(canvas,(x0,y0),(x0+r,y0+r),int(br),t)
 			return img
 
-		switcher = {
-			'circle': _circle_opencv,
-			'square': _square_opencv
-		}
-		return switcher[shape](x,y,r,br,t,side)
+		if t == 1:
+			switcher = {
+				'circle': _circle_bresenham,
+				'square': _square_bresenham
+			}
+			return switcher[shape](x,y,r,br,side)
+		else:
+			switcher = {
+				'circle': _circle_opencv,
+				'square': _square_opencv
+			}
+			return switcher[shape](x,y,r,br,t,side)
 
 	def random_labels(self):			
 		sz_lo = self.draw_limits['sz_lo']
@@ -86,8 +132,7 @@ class SpecDraw:
 		th_co = self.draw_limits['th']			
 
 		labels = []
-		for i in range(self.num_classes):
-			cl = np.full(self.num_imgs_per_class,i)
+		for i in range(self.num_classes):			
 			th = np.full(self.num_imgs_per_class,th_co)
 			br = np.random.randint(low=br_lo,high=br_hi,size=self.num_imgs_per_class)
 			x0 = np.zeros(self.num_imgs_per_class)
@@ -110,8 +155,8 @@ class SpecDraw:
 					hi = self.img_side-s
 					x0[ind] = np.random.randint(low=lo,high=hi,size=ind.size)
 					y0[ind] = np.random.randint(low=lo,high=hi,size=ind.size)
-			labels.append(np.stack([cl,x0,y0,sz,br,th],axis=1))	
-		labels = np.vstack(labels)
+			labels.append(np.stack([x0,y0,sz,br,th],axis=1))	
+		labels = np.stack(labels)
 		return labels.astype(int)
 
 
@@ -121,17 +166,18 @@ class SpecDraw:
 		self.dataset.mkdir(exist_ok=False)
 
 		y_draw = self.random_labels()
-		# utils.plot_label_spread(self.dataset/'label_spread.png',y_draw,self.img_side)
+		labels = {}
 		for i in range(self.num_classes):
 			class_name = self.class_names[i]
 			print('Drawing %s\n' % class_name)
 			class_dir = self.dataset / class_name				
 			class_dir.mkdir(exist_ok=False)
-			y_class = y_draw[np.where(y_draw[:,0] == i)]
+			y_class = y_draw[i]
 			for j in tqdm(range(y_class.shape[0])):
 				y = y_class[j]
-				shape = SpecDraw.draw_shape(class_name,y[1],y[2],y[3],y[4],y[5],self.img_side)
+				shape = SpecDraw.draw_shape(class_name,y[0],y[1],y[2],y[3],y[4],self.img_side)
 				shape = shape.reshape(self.img_side,self.img_side,1)
 				np.save(class_dir/('%d.npy' % j),shape)
-		np.save(self.dataset/'labels.npy',y_draw)
+			labels[class_name] = y_class
+		pickle.dump(labels,open(self.labels,'wb'))		
 		self._save_settings()
