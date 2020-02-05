@@ -53,7 +53,7 @@ def plot_samples(imgs,savename,size=(20,10),fontsize=25,title=None,labels=None):
 	fig.savefig(savename)
 	plt.close()
 
-def plot_label_spread(savename,labels,d,hits=None,step=1):
+def plot_label_spread(savename,labels,d,misses_dict=None,step=1):
 	COL_X0 = 0
 	COL_Y0 = 1
 	COL_SZ = 2
@@ -62,15 +62,15 @@ def plot_label_spread(savename,labels,d,hits=None,step=1):
 	class_names.sort()	
 	num_classes = len(class_names)
 	
-	if hits is None:
+	if misses_dict is None:
 		fig,axs = plt.subplots(3,num_classes,figsize=(20,15))
 	else:
 		fig,axs = plt.subplots(4,num_classes,figsize=(20,15))
 	
 	for c in range(num_classes):		
-		y 	= labels[class_names[c]]		
-		if not hits is None:
-			misses = np.where(hits[ind] == False)[0]
+		y 	= labels[class_names[c]]
+		if not misses_dict is None:
+			misses = misses_dict[class_names[c]]
 
 		ax_cnt = 0
 		#anchor spread
@@ -89,7 +89,7 @@ def plot_label_spread(savename,labels,d,hits=None,step=1):
 		ax.set_yticklabels(h_lbl)
 		ax.invert_yaxis()
 		fig.colorbar(h1[3],ax=ax)
-		if not hits is None:
+		if not misses_dict is None:
 			ax_cnt += 1
 			ax = axs[ax_cnt,c]
 			x0_miss = y[misses,COL_X0]
@@ -113,7 +113,7 @@ def plot_label_spread(savename,labels,d,hits=None,step=1):
 		sz_dis  = np.bincount(sz,minlength=sz_max+1)[sz_rng]
 		ax.bar(sz_rng,sz_dis)
 		ax.set_xticks(sz_rng[0:len(sz_rng):step])
-		if not hits is None:
+		if not misses_dict is None:
 			sz_miss = y[misses,COL_SZ]
 			if sz_miss.size != 0:
 				p_miss = np.bincount(sz_miss,minlength=sz_max+1)[sz_rng]
@@ -130,7 +130,7 @@ def plot_label_spread(savename,labels,d,hits=None,step=1):
 		br_dis = np.bincount(br,minlength=br_max+1)[br_rng]
 		ax.bar(br_rng,br_dis)
 		ax.set_xticks(br_rng[0:len(br_rng):10*step])
-		if not hits is None:
+		if not misses_dict is None:
 			br_miss = y[misses,COL_BR]
 			if br_miss.size != 0:
 				p_miss = np.bincount(br_miss,minlength=br_max+1)[br_rng]
@@ -139,10 +139,27 @@ def plot_label_spread(savename,labels,d,hits=None,step=1):
 	
 	fig.savefig(savename)
 
+
+def path_to_class_and_idx(path):
+	class_name  = path.split('/')[-2]
+	sample_id  = int(path.split('/')[-1].split('.')[0])
+	return class_name,sample_id
+
+def paths_to_indexes(paths,classes):
+	indexes = {}	
+	for c in classes:
+		indexes[c] = np.array([],dtype=int)
+	
+	for path in paths:
+		class_name,sample_id  = path_to_class_and_idx(path)		
+		indexes[class_name] = np.concatenate([indexes[class_name],[sample_id]]) 
+
+	return indexes
+
+
 def get_annotations_for_batch(sample_npys,labels_pkl,class_to_idx):
 	def _path_to_ann(path):
-		class_name  = path.split('/')[-2]
-		sample_id  = int(path.split('/')[-1].split('.')[0])
+		class_name,sample_id  = path_to_class_and_idx(path)		 
 		ann = [class_to_idx[class_name]] + list(y_ann[class_name][sample_id])		
 		return ann
 	

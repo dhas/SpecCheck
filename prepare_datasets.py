@@ -107,17 +107,4 @@ if __name__ == '__main__':
 	other_utils.plot_label_spread(plots_dir/'4_sd_label_spread.png',
 			y_draw,
 			dataset_settings['img_side'],
-			step=1)
-
-	# print('Done')
-
-	# from torch.utils.data import DataLoader
-
-	# ds = train_utils.DrawDataset(root=sd_shapes.dataset,
-	# 	loader=train_utils.npy_loader,
-	# 	extensions='.npy')
-	# dl = DataLoader(dataset=ds,
-	# 	batch_size=128,
-	# 	shuffle=True)
-
-	# x,y,p = next(iter(dl))
+			step=1)	
