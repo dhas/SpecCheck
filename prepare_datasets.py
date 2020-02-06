@@ -51,11 +51,11 @@ def check_qd_bins(root,bins,prefix_url):
 	return bins_present
 
 
-if __name__ == '__main__':
-	draw_cfg = config.get_draw_config()
-	plots_dir = Path('./_plots')
+def main(plots_dir):
+	plots_dir = plots_dir/'dataset'
 	plots_dir.mkdir(exist_ok=True)
-
+	
+	draw_cfg = config.get_draw_config()
 	qd_shapes_root = Path(draw_cfg['root'])/draw_cfg['qd']['root']
 	qd_shapes_root.mkdir(parents=True,exist_ok=True)
 	
@@ -95,3 +95,6 @@ if __name__ == '__main__':
 			y_draw,
 			draw_cfg['img_side'],
 			step=1)	
+
+	if __name__ == '__main__':
+		main(Path('./plots'))
