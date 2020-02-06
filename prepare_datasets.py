@@ -5,8 +5,9 @@ from draw.quick_draw import QuickDraw
 from draw.spec_draw import SpecDraw
 from utils import train_utils
 from utils import other_utils
+from config import config
 
-def sample_dataset(dataset_dir, savename, annotation_src=None):
+def sample_dataset(dataset_dir, savename, annotations=None):
 	def _get_one_batch(loader):
 		for batch in loader:
 			x,y,fnames = batch			
@@ -22,21 +23,20 @@ def sample_dataset(dataset_dir, savename, annotation_src=None):
 	batch_imgs   = other_utils.as_rows_and_cols(x,r,c)
 	title 	= '%s' % loader.dataset.class_to_idx
 
-	if annotation_src is None:
+	if annotations is None:
 		other_utils.plot_samples(batch_imgs,
 				savename,
 				title=title,
 				labels=y.reshape(r,c,1))
 	else:
-		ann 	= other_utils.get_annotations_for_batch(fnames,annotation_src,loader.dataset.class_to_idx)		
+		ann 	= other_utils.get_annotations_for_batch(fnames,annotations,loader.dataset.class_to_idx)		
 		other_utils.plot_samples(batch_imgs,
 				savename,
 				title=title,
 				labels=ann.reshape(r,c,-1))		
 
-def check_qd_bins(root,bins):
-	prefix_shown = False
-	prefix_url   = 'https://console.cloud.google.com/storage/quickdraw_dataset/full/binary/'
+def check_qd_bins(root,bins,prefix_url):
+	prefix_shown = False	
 	bins_present = True
 	
 	for bin in bins:
@@ -52,34 +52,21 @@ def check_qd_bins(root,bins):
 
 
 if __name__ == '__main__':
-	dataset_settings = {
-		'img_side' 			: 28,
-		'qd_imgs_per_class'	: 25000,
-		'sd_imgs_per_class'	: 5000,
-
-	}
-
-	draw_limits = {
-		'sz_lo' : 5,
-		'sz_hi' : 10,
-		'br_lo' : 100,
-		'br_hi' : 255,
-		'th' 	: 1
-	}
-
+	draw_cfg = config.get_draw_config()
 	plots_dir = Path('./_plots')
 	plots_dir.mkdir(exist_ok=True)
 
-	qd_shapes_root = Path('./datasets/qd_shapes')
+	qd_shapes_root = Path(draw_cfg['root'])/draw_cfg['qd']['root']
 	qd_shapes_root.mkdir(parents=True,exist_ok=True)
-	qd_shapes_bins = ['full_binary_circle.bin','full_binary_square.bin']
-	if check_qd_bins(qd_shapes_root,qd_shapes_bins):
+	
+	qd_shapes_bins = draw_cfg['qd']['bins']
+	if check_qd_bins(qd_shapes_root,qd_shapes_bins,draw_cfg['qd']['bins_url']):
 		print('All bins present, extracting qd-shapes')
 		
 		qd_shapes = QuickDraw(qd_shapes_root,
-		dataset_settings['img_side'],
-		dataset_settings['qd_imgs_per_class'],
-		draw_limits['sz_lo']-1)
+		draw_cfg['img_side'],
+		draw_cfg['qd']['imgs_per_class'],
+		draw_cfg['qd']['min_sz'])
 		print('Done')
 		sample_dataset(qd_shapes.dataset,
 		plots_dir/'1_qd_examples.png')
@@ -87,24 +74,24 @@ if __name__ == '__main__':
 		y_est = pickle.load(open(qd_shapes.est_labels,'rb'))
 		other_utils.plot_label_spread(plots_dir/'2_qd_est_label_spread.png',
 			y_est,
-			dataset_settings['img_side'],
+			draw_cfg['img_side'],
 			step=1)
 
 	print('Drawing sd-shapes')
-	sd_shapes_root = Path('./datasets/sd_shapes')
+	sd_shapes_root = Path(draw_cfg['root'])/draw_cfg['sd']['root']
 	sd_shapes_root.mkdir(exist_ok=True)
 	
 	sd_shapes = SpecDraw(sd_shapes_root,
-	dataset_settings['img_side'],
-	dataset_settings['sd_imgs_per_class'],
-	draw_limits)
+	draw_cfg['img_side'],
+	draw_cfg['sd']['imgs_per_class'],
+	draw_cfg['sd']['draw_limits'])
 
 	sample_dataset(sd_shapes.dataset,
 	('%s/3_sd_examples.png' % plots_dir),
-	annotation_src=sd_shapes.labels)
+	annotations=pickle.load(open(sd_shapes.labels,'rb')))
 
 	y_draw = pickle.load(open(sd_shapes.labels,'rb'))
 	other_utils.plot_label_spread(plots_dir/'4_sd_label_spread.png',
 			y_draw,
-			dataset_settings['img_side'],
+			draw_cfg['img_side'],
 			step=1)	
