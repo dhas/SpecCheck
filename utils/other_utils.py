@@ -157,12 +157,11 @@ def paths_to_indexes(paths,classes):
 	return indexes
 
 
-def get_annotations_for_batch(sample_npys,labels_pkl,class_to_idx):
+def get_annotations_for_batch(sample_npys,y_ann,class_to_idx):
 	def _path_to_ann(path):
 		class_name,sample_id  = path_to_class_and_idx(path)		 
 		ann = [class_to_idx[class_name]] + list(y_ann[class_name][sample_id])		
 		return ann
-	
-	y_ann   = pickle.load(open(labels_pkl,'rb'))
+		
 	y_batch = np.stack([_path_to_ann(p) for p in sample_npys])
 	return y_batch

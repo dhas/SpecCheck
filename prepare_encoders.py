@@ -143,17 +143,19 @@ for net_name in list(cfg.keys()):
 
 	print('')
 	explainer = DatasetExplainer(encoder,device,checkpoint_path)
-	loss,accuracy = explainer.evaluate(device,criterion,val_loader)
-	print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+	# loss,accuracy = explainer.evaluate(device,criterion,val_loader)
+	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
 	specset_dir = Path('./datasets/sd_shapes/dataset')
 	spec_loader = train_utils.get_npy_dataloader(specset_dir,
 		100,
 		transforms=trans)
 	
-	print('\nOOD evaluation')
-	loss,accuracy,ood_npys = explainer.explain(device,criterion,spec_loader)
 	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
+	explainer.shap_explain(device,criterion,spec_loader,labels_dict,train_params['savedir'])	
+
+	print('\nOOD evaluation')
+	loss,accuracy,ood_npys = explainer.explain(device,criterion,spec_loader)	
 	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
 	print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 	other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
