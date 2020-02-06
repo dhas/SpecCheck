@@ -12,7 +12,7 @@ class Encoder(nn.Module):
 		net_cfg_arr = np.array(net_cfg['head'])
 		num_pools = len(np.where(net_cfg_arr == 'M')[0])		
 		_f_dims = input_dim // (2**num_pools)		
-		_f_channels = int(net_cfg_arr[net_cfg_arr != 'M'][-1])
+		_f_channels = int(net_cfg_arr[net_cfg_arr != 'M'][-1].split('#')[0])
 
 		self.tail = self._make_tail(net_cfg['tail'],
 				_f_channels*_f_dims*_f_dims,
@@ -46,7 +46,8 @@ class Encoder(nn.Module):
 				if len(block_cfg) > 1:
 					if block_cfg[1] == 'BN':
 						block_layers += [nn.BatchNorm2d(out_channels)]
-					
+					elif block_cfg[1] == 'IN':
+						block_layers += [nn.InstanceNorm2d(out_channels)]					
 				block_layers += [nn.ReLU(inplace=True)]
 				layers += block_layers					
 				in_channels = out_channels
