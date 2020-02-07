@@ -118,7 +118,11 @@ class EncoderTrainer:
 		
 		#log after epoch
 		self._log_training(epoch,batch_idx,len(data),len(train_loader),loss)
-		val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
+		if epoch == self.params['epochs']:
+			val_break = -1
+		else:
+			val_break = 9
+		val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data),val_break=val_break)
 		self._log_validation(val_loss,correct,total,accuracy,end='\n')
 
 	def fit(self,checkpoint_path):
