@@ -73,85 +73,85 @@ cfg = {
 	# 'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
 
+def main(out_dir):
+	encoders_root = out_dir/'_encoders'
+	encoders_root.mkdir(exist_ok=True)
 
-encoders_root = Path('./_encoders')
-encoders_root.mkdir(exist_ok=True)
+	draw_cfg = config.get_draw_config()
 
-draw_cfg = config.get_draw_config()
+	dataset_dir = Path('./_datasets/qd_shapes/dataset')
+	dataset_settings = read_settings(dataset_dir/'settings.json')
 
-dataset_dir = Path('./_dataset/qd_shapes/dataset')
-dataset_settings = read_settings(dataset_dir/'settings.json')
-
-input_shape = (1,draw_cfg['img_side'],draw_cfg['img_side'])
+	input_shape = (1,draw_cfg['img_side'],draw_cfg['img_side'])
 
 
-training_settings = {
-	'epochs':1,
-	'log_interval': 5,
-	'batch_size': 32,
-}
-trans = transforms.Compose([
-	transforms.Lambda(lambda x:x.permute(2,0,1).type(torch.FloatTensor))
-])
-criterion = nn.CrossEntropyLoss()
-
-device = torch.device('cuda')
-for net_name in list(cfg.keys()):	
-	
-	train_params = {
-		'savedir'		: encoders_root/net_name,		
-		'epochs'		: 1,
-		'log_interval'	: 20,
-		'batch_size'	: 32,     
+	training_settings = {
+		'epochs':1,
+		'log_interval': 5,
+		'batch_size': 32,
 	}
+	trans = transforms.Compose([
+		transforms.Lambda(lambda x:x.permute(2,0,1).type(torch.FloatTensor))
+	])
+	criterion = nn.CrossEntropyLoss()
 
-	train_params['savedir'].mkdir(exist_ok=True)
-	checkpoint_path = train_params['savedir']/('%s.tar' % net_name)
-	cfg_path        = train_params['savedir']/('%s.pkl' % net_name)
-	
-	
-	encoder = Encoder(net_name,
-		draw_cfg['img_side'],
-		cfg[net_name],
-		draw_cfg['num_classes'])
-	encoder.to(device)
-	summary(encoder,input_shape)
+	device = torch.device('cuda')
+	for net_name in list(cfg.keys()):	
+		
+		train_params = {
+			'savedir'		: encoders_root/net_name,		
+			'epochs'		: 1,
+			'log_interval'	: 20,
+			'batch_size'	: 32,     
+		}
 
-	train_loader,val_loader = train_utils.get_npy_train_loader(dataset_dir,
-		training_settings['batch_size'],
-		training_settings['batch_size'],
-		transforms=trans)	
+		train_params['savedir'].mkdir(exist_ok=True)
+		checkpoint_path = train_params['savedir']/('%s.tar' % net_name)
+		cfg_path        = train_params['savedir']/('%s.pkl' % net_name)
+		
+		
+		encoder = Encoder(net_name,
+			draw_cfg['img_side'],
+			cfg[net_name],
+			draw_cfg['num_classes'])
+		encoder.to(device)
+		summary(encoder,input_shape)
 
-	if not training_necessary(checkpoint_path,cfg[net_name],cfg_path):
-		print('Encoder %s already trained' % net_name)
-	else:
-		print('Training encoder %s' % net_name)
-		optimizer = cfg[net_name]['trn']['optim'](encoder.parameters(),
-				lr = cfg[net_name]['trn']['lr'])
+		train_loader,val_loader = train_utils.get_npy_train_loader(dataset_dir,
+			training_settings['batch_size'],
+			training_settings['batch_size'],
+			transforms=trans)	
+
+		if not training_necessary(checkpoint_path,cfg[net_name],cfg_path):
+			print('Encoder %s already trained' % net_name)
+		else:
+			print('Training encoder %s' % net_name)
+			optimizer = cfg[net_name]['trn']['optim'](encoder.parameters(),
+					lr = cfg[net_name]['trn']['lr'])
 
 
-		trainer = EncoderTrainer(encoder,device,
-				train_loader,val_loader,
-				criterion,optimizer,
-				train_params)
-		trainer.fit(checkpoint_path)
-		pickle.dump(cfg[net_name],open(cfg_path,'wb'))
+			trainer = EncoderTrainer(encoder,device,
+					train_loader,val_loader,
+					criterion,optimizer,
+					train_params)
+			trainer.fit(checkpoint_path)
+			pickle.dump(cfg[net_name],open(cfg_path,'wb'))
 
-# 	print('')
-	explainer = DatasetExplainer(encoder,device,checkpoint_path)
-# 	# loss,accuracy = explainer.evaluate(device,criterion,val_loader)
-# 	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+	# 	print('')
+		explainer = DatasetExplainer(encoder,device,checkpoint_path)
+	# 	# loss,accuracy = explainer.evaluate(device,criterion,val_loader)
+	# 	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
-	specset_dir = Path('./_dataset/sd_shapes/dataset')
-	spec_loader = train_utils.get_npy_dataloader(specset_dir,
-		100,
-		transforms=trans)
-	
-	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
-	loss,accuracy,anns,preds,ood_npys = explainer.evaluate(device,criterion,spec_loader,labels_dict)
-	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
-	other_utils.plot_label_spread(train_params['savedir']/'1_ood_hist.png',
-		labels_dict,
-		draw_cfg['img_side'],
-		misses_dict=misses_dict)
-	explainer.shap_explain(anns,preds,spec_loader.dataset.class_to_idx,train_params['savedir'])
+		specset_dir = Path('./_datasets/sd_shapes/dataset')
+		spec_loader = train_utils.get_npy_dataloader(specset_dir,
+			100,
+			transforms=trans)
+		
+		labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
+		loss,accuracy,anns,preds,ood_npys = explainer.evaluate(device,criterion,spec_loader,labels_dict)
+		misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
+		other_utils.plot_label_spread(train_params['savedir']/'1_ood_hist.png',
+			labels_dict,
+			draw_cfg['img_side'],
+			misses_dict=misses_dict)
+		explainer.shap_explain(anns,preds,spec_loader.dataset.class_to_idx,train_params['savedir'])
