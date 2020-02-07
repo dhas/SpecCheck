@@ -1,6 +1,7 @@
 #configuration for quick-draw and spec-draw
 root: '_dataset'
 img_side  : 28
+num_classes : 2
 qd : {
   root : 'qd_shapes',
   imgs_per_class : 25000,

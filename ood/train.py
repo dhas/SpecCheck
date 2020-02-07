@@ -125,8 +125,7 @@ class EncoderTrainer:
 		val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data),val_break=val_break)
 		self._log_validation(val_loss,correct,total,accuracy,end='\n')
 
-	def fit(self,checkpoint_path):
-			
+	def fit(self,checkpoint_path):			
 		for epoch in range(1, self.params['epochs'] + 1):
 			self._train_epoch(self.model, self.device, 
 				self.train_loader, self.val_loader, 
