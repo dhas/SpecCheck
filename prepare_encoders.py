@@ -5,10 +5,10 @@ import torch
 from torch import nn, optim
 import torchvision.transforms as transforms
 from torchsummary import summary
+from draw import load
 from ood.encoder import Encoder
 from ood.train import EncoderTrainer
 from ood.explain import DatasetExplainer
-from utils import train_utils
 from utils import other_utils
 from config import config
 
@@ -117,7 +117,7 @@ def main(out_dir):
 		encoder.to(device)
 		summary(encoder,input_shape)
 
-		train_loader,val_loader = train_utils.get_npy_train_loader(dataset_dir,
+		train_loader,val_loader = load.get_npy_train_loader(dataset_dir,
 			training_settings['batch_size'],
 			training_settings['batch_size'],
 			transforms=trans)	
@@ -143,7 +143,7 @@ def main(out_dir):
 	# 	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
 		specset_dir = Path('./_datasets/sd_shapes/dataset')
-		spec_loader = train_utils.get_npy_dataloader(specset_dir,
+		spec_loader = load.get_npy_dataloader(specset_dir,
 			100,
 			transforms=trans)
 		

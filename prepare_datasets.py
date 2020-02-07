@@ -3,7 +3,7 @@ import pickle
 from pathlib import Path
 from draw.quick_draw import QuickDraw
 from draw.spec_draw import SpecDraw
-from utils import train_utils
+from draw import load
 from utils import other_utils
 from config import config
 
@@ -16,7 +16,7 @@ def sample_dataset(dataset_dir, savename, annotations=None):
 
 	
 	num_samples = 16
-	loader = train_utils.get_npy_dataloader(dataset_dir,num_samples)
+	loader = load.get_npy_dataloader(dataset_dir,num_samples)
 
 	x,y,fnames = _get_one_batch(loader)
 	r,c = 2,8
