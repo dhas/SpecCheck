@@ -96,5 +96,5 @@ def main(plots_dir):
 			draw_cfg['img_side'],
 			step=1)	
 
-	if __name__ == '__main__':
-		main(Path('./plots'))
+if __name__ == '__main__':
+	main(Path('./plots'))

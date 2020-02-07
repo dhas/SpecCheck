@@ -52,73 +52,74 @@ class EncoderTrainer:
 
 
 	def _log_training(self,epoch, batch_idx, batch_size, num_batches,loss):
-	    print('\nTrain Epoch: {:3d} [{:4d}/{:4d} ({:.0f}%)]\tLoss: {:.6f}'.format(
-	                epoch, 
-	                batch_idx * batch_size,
-	                num_batches*batch_size,
-	                100. * batch_idx / num_batches,
-	                loss.item()),
-	                end = '\t'
-	            )
-	    self._plot_train_history()
+		print('\nTrain Epoch: {:3d} [{:4d}/{:4d} ({:.0f}%)]\tLoss: {:.6f}'.format(
+					epoch, 
+					batch_idx * batch_size,
+					num_batches*batch_size,
+					100. * batch_idx / num_batches,
+					loss.item()),
+					end = '\t'
+				)
+		self._plot_train_history()
 	
 	def _log_validation(self,val_loss,correct,total,accuracy,end=''):		
 		print('Validate set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)'.format(val_loss, correct, total, accuracy),end=end)
 
-	def _validate(self,model, device, val_loader, criterion, epoch,batch_size):
-	    model.eval()
-	    val_loss = 0
-	    correct = 0
+	def _validate(self,model, device, val_loader, criterion, epoch,batch_size,val_break=9):
+		model.eval()
+		val_loss = 0
+		correct = 0
+		length = 0
 
-	    with torch.no_grad():
-	        for batch_idx, (data, target) in enumerate(val_loader):
-	            data, target = data.to(device), target.to(device)
-	            output = model(data)
-	            val_loss += criterion(output, target).item()  # sum up batch loss
-	            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-	            correct += pred.eq(target.view_as(pred)).sum().item()
-	            # validate 10 batches is enough and fast
-	            if batch_idx == 9:
-	                break
+		with torch.no_grad():
+			for batch_idx, (data, target) in enumerate(val_loader):
+				data, target = data.to(device), target.to(device)
+				output = model(data)
+				val_loss += criterion(output, target).item()  # sum up batch loss
+				pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+				correct += pred.eq(target.view_as(pred)).sum().item()
+				length += len(data)
+				# validate 10 batches is enough and fast
+				if batch_idx == val_break:
+					break
 
-	    length = 10 * batch_size
-	    val_loss /= 10
-	    accuracy = 100. * correct / length
+		val_loss /= length
+		accuracy = 100. * correct / length
 
-	    return val_loss,correct,length,accuracy    
+		return val_loss,correct,length,accuracy    
 	
 	def _train_epoch(self,model, device, train_loader, val_loader, optimizer, criterion, epoch,log_interval):		
-	    model.to(device)
-	    log_count = 0
-	    for batch_idx, (data, target) in enumerate(train_loader):
-	        model.train()
-	        data = data.to(device)
-	        target = target.to(device)
-	        optimizer.zero_grad()
-	        output = model(data)
-	        loss = criterion(output, target)
-	        loss.backward()
-	        optimizer.step()
-
-	        self.train_history['iteration'].append(batch_idx*epoch)
-	        self.train_history['loss'].append(loss.item())
-	        
-	        # print train progress every log_interval
-	        if batch_idx % log_interval == 0:
-	            self._log_training(epoch,batch_idx,len(data),len(train_loader),loss)
-	            if log_count % log_interval == 0:
-	                val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
-	                self.val_history['iteration'].append(batch_idx*epoch)
-	                self.val_history['loss'].append(val_loss)
-	                self.val_history['accuracy'].append(accuracy)
-	                self._log_validation(val_loss,correct,total,accuracy)
-	                self._save_train_history()
-	            log_count += 1        
-	    
-	    #log after epoch
-	    self._log_training(epoch,batch_idx,len(data),len(train_loader),loss)
-	    val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
-	    self._log_validation(val_loss,correct,total,accuracy,end='\n')
+		model.to(device)
+		log_count = 0
+		for batch_idx, (data, target) in enumerate(train_loader):
+			model.train()
+			data = data.to(device)
+			target = target.to(device)
+			optimizer.zero_grad()
+			output = model(data)
+			loss = criterion(output, target)
+			loss.backward()
+			optimizer.step()
+			
+			
+			# print train progress every log_interval			
+			if batch_idx % log_interval == 0:
+				self.train_history['iteration'].append(batch_idx*epoch)
+				self.train_history['loss'].append(loss.item())
+				self._log_training(epoch,batch_idx,len(data),len(train_loader),loss)
+				if log_count % log_interval == 0:
+					val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
+					self.val_history['iteration'].append(batch_idx*epoch)
+					self.val_history['loss'].append(val_loss)
+					self.val_history['accuracy'].append(accuracy)
+					self._log_validation(val_loss,correct,total,accuracy)
+					self._save_train_history()
+				log_count += 1        
+		
+		#log after epoch
+		self._log_training(epoch,batch_idx,len(data),len(train_loader),loss)
+		val_loss,correct,total,accuracy = self._validate(model, device, val_loader, criterion, epoch,len(data))
+		self._log_validation(val_loss,correct,total,accuracy,end='\n')
 
 	def fit(self,checkpoint_path):
 			

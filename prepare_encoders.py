@@ -27,36 +27,36 @@ def training_necessary(checkpoint_path,cfg,cfg_path):
 
 cfg = {
 		
-	'NET01' : {'head'  :['4','M'],
-			   'tail'  :['4'],			   
-			   'trn'   :{
-							'optim'	: optim.RMSprop,
-							'lr'	: 1e-4,			   				
-						},
-			  },
+	# 'NET01' : {'head'  :['4','M'],
+	# 		   'tail'  :['4'],			   
+	# 		   'trn'   :{
+	# 						'optim'	: optim.RMSprop,
+	# 						'lr'	: 1e-4,			   				
+	# 					},
+	# 		  },
 
-	'NET02' : {'head'  :['32', 'M', '64', 'M'],
-			   'tail'  :['128'],
-			   'trn'   :{
-							'optim'	: optim.Adam,
-							'lr'	: 1e-4,			   				
-						},
-			  },
+	# 'NET02' : {'head'  :['32', 'M', '64', 'M'],
+	# 		   'tail'  :['128'],
+	# 		   'trn'   :{
+	# 						'optim'	: optim.Adam,
+	# 						'lr'	: 1e-4,			   				
+	# 					},
+	# 		  },
 
-	'NET03' : {'head'  :['32', 'M', '64', 'M'],
-			   'tail'  :['128', 'D#0.5'],
-			   'trn'   :{
-							'optim'	: optim.Adam,
-							'lr'	: 1e-4,			   				
-						},
-			  },
-	'NET04' : {'head'  :['32#BN', 'M', '64#BN', 'M'],
-			   'tail'  :['128'],
-			   'trn'   :{
-							'optim'	: optim.Adam,
-							'lr'	: 1e-4,			   				
-						},
-			  },
+	# 'NET03' : {'head'  :['32', 'M', '64', 'M'],
+	# 		   'tail'  :['128', 'D#0.5'],
+	# 		   'trn'   :{
+	# 						'optim'	: optim.Adam,
+	# 						'lr'	: 1e-4,			   				
+	# 					},
+	# 		  },
+	# 'NET04' : {'head'  :['32#BN', 'M', '64#BN', 'M'],
+	# 		   'tail'  :['128'],
+	# 		   'trn'   :{
+	# 						'optim'	: optim.Adam,
+	# 						'lr'	: 1e-4,			   				
+	# 					},
+	# 		  },
 	'NET05' : {'head'  :['32#IN', 'M', '64#IN', 'M'],
 			   'tail'  :['128'],
 			   'trn'   :{
@@ -77,7 +77,7 @@ encoders_root = Path('./_encoders')
 encoders_root.mkdir(exist_ok=True)
 
 
-dataset_dir = Path('./datasets/qd_shapes/dataset')
+dataset_dir = Path('./_dataset/qd_shapes/dataset')
 dataset_settings = read_settings(dataset_dir/'settings.json')
 
 model_settings = {
@@ -138,27 +138,28 @@ for net_name in list(cfg.keys()):
 				criterion,optimizer,
 				train_params)
 		trainer.fit(checkpoint_path)
+		break
 	
-		pickle.dump(cfg[net_name],open(cfg_path,'wb'))
+# 		pickle.dump(cfg[net_name],open(cfg_path,'wb'))
 
-	print('')
-	explainer = DatasetExplainer(encoder,device,checkpoint_path)
-	# loss,accuracy = explainer.evaluate(device,criterion,val_loader)
-	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+# 	print('')
+# 	explainer = DatasetExplainer(encoder,device,checkpoint_path)
+# 	# loss,accuracy = explainer.evaluate(device,criterion,val_loader)
+# 	# print('\nEvaluation on validation set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
 
-	specset_dir = Path('./datasets/sd_shapes/dataset')
-	spec_loader = train_utils.get_npy_dataloader(specset_dir,
-		100,
-		transforms=trans)
+# 	specset_dir = Path('./_datasets/sd_shapes/dataset')
+# 	spec_loader = train_utils.get_npy_dataloader(specset_dir,
+# 		100,
+# 		transforms=trans)
 	
-	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
-	explainer.shap_explain(device,criterion,spec_loader,labels_dict,train_params['savedir'])	
+# 	labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
+# 	explainer.shap_explain(device,criterion,spec_loader,labels_dict,train_params['savedir'])	
 
-	print('\nOOD evaluation')
-	loss,accuracy,ood_npys = explainer.explain(device,criterion,spec_loader)	
-	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
-	print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
-	other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
-		labels_dict,
-		model_settings['img_side'],
-		misses_dict=misses_dict)
+# 	print('\nOOD evaluation')
+# 	loss,accuracy,ood_npys = explainer.explain(device,criterion,spec_loader)	
+# 	misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
+# 	print('\nEvaluation on Spec set: Loss {:.4f}, Accuracy {:.2f}%\n'.format(loss,accuracy))
+# 	other_utils.plot_label_spread(train_params['savedir']/'1_ood_spread.png',
+# 		labels_dict,
+# 		model_settings['img_side'],
+# 		misses_dict=misses_dict)
