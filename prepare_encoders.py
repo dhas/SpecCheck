@@ -35,59 +35,12 @@ def get_optimizer(parameters,settings):
 	return optimizer
 
 
-# cfg = {
-		
-# 	'NET01' : {'head'  :['4','M'],
-# 			   'tail'  :['4'],			   
-# 			   'trn'   :{
-# 							'optim'	: optim.RMSprop,
-# 							'lr'	: 1e-4,			   				
-# 						},
-# 			  },
-
-# 	'NET02' : {'head'  :['32', 'M', '64', 'M'],
-# 			   'tail'  :['128'],
-# 			   'trn'   :{
-# 							'optim'	: optim.Adam,
-# 							'lr'	: 1e-4,			   				
-# 						},
-# 			  },
-
-# 	'NET03' : {'head'  :['32', 'M', '64', 'M'],
-# 			   'tail'  :['128', 'D#0.5'],
-# 			   'trn'   :{
-# 							'optim'	: optim.Adam,
-# 							'lr'	: 1e-4,			   				
-# 						},
-# 			  },
-# 	'NET04' : {'head'  :['32#BN', 'M', '64#BN', 'M'],
-# 			   'tail'  :['128'],
-# 			   'trn'   :{
-# 							'optim'	: optim.Adam,
-# 							'lr'	: 1e-4,			   				
-# 						},
-# 			  },
-# 	'NET05' : {'head'  :['32#IN', 'M', '64#IN', 'M'],
-# 			   'tail'  :['128'],
-# 			   'trn'   :{
-# 							'optim'	: optim.Adam,
-# 							'lr'	: 1e-4,			   				
-# 						},
-# 			  },
-# 	# 'VGG05': [64, 'M', 128, 'M'],
-# 	# 'VGG07': [64, 'M', 128, 'M', 256, 256, 'M'],
-# 	# 'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-# 	# 'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-# 	# 'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
-# 	# 'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
-# }
-
-def main(out_dir):
+def main(project_root,out_dir):
 	encoders_root = out_dir/'_encoders'
 	encoders_root.mkdir(exist_ok=True)
 
-	draw_cfg = config.get_draw_config()
-	enc_cfg  = config.get_encoders_config()
+	draw_cfg = config.get_draw_config(project_root)
+	enc_cfg  = config.get_encoders_config(project_root)
 
 	dataset_dir = Path(draw_cfg['root'])/draw_cfg['qd']['root']/'dataset'
 	dataset_settings = read_settings(dataset_dir/'settings.json')
@@ -155,4 +108,4 @@ def main(out_dir):
 		explainer.shap_explain(anns,preds,spec_loader.dataset.class_to_idx,train_params['savedir'])
 
 if __name__ == '__main__':
-	main(Path('./_outputs'))
+	main(Path('./'), Path('./_outputs'))
