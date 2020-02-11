@@ -3,7 +3,14 @@ import torch
 import torch
 from torchvision.datasets import DatasetFolder
 from torch.utils.data import DataLoader,random_split
+import torchvision.transforms as transforms
 
+def get_transformations(mean,var):
+	trans = transforms.Compose([
+				transforms.Lambda(lambda x:x.permute(2,0,1).type(torch.FloatTensor)),
+				transforms.Normalize(mean=[mean], std=[np.sqrt(var)])
+		])
+	return trans
 
 class DrawDataset(DatasetFolder):	
 

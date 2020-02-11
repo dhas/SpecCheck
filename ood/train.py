@@ -7,6 +7,12 @@ import sys
 sys.path.append('..')
 from utils import other_utils
 
+def training_necessary(checkpoint_path,cfg,cfg_path):	
+	training_needed = (not checkpoint_path.exists()) or \
+		(not cfg_path.exists()) or \
+		(cfg != pickle.load(open(cfg_path,'rb')))
+	return training_needed
+
 class EncoderTrainer:
 	def __init__(self,model,device,train_loader,val_loader,criterion,optimizer,params):
 		self.model 		  = model

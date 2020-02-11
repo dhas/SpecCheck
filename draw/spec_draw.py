@@ -19,6 +19,8 @@ class SpecDraw:
 		self.class_names  = ['circle', 'square']
 		self.num_classes = len(self.class_names)
 		self.draw_limits = draw_limits
+		self.pop_mean = 0
+		self.pop_var  = 0
 
 		if self._settings_changed():
 			self._draw_dataset()
@@ -38,6 +40,8 @@ class SpecDraw:
 		settings['num_imgs_per_class'] 	= self.num_imgs_per_class
 		settings['img_side'] 			= self.img_side
 		settings['draw_limits'] 		= self.draw_limits
+		settings['mean'] 				= self.pop_mean
+		settings['variance'] 			= self.pop_var
 		with open(self.settings,'w') as f:
 			f.write(json.dumps(settings))
 
@@ -178,6 +182,10 @@ class SpecDraw:
 				shape = SpecDraw.draw_shape(class_name,y[0],y[1],y[2],y[3],y[4],self.img_side)
 				shape = shape.reshape(self.img_side,self.img_side,1)
 				np.save(class_dir/('%d.npy' % j),shape)
+				self.pop_mean += shape.mean()
+				self.pop_var  += shape.var()
 			labels[class_name] = y_class
+		self.pop_mean = self.pop_mean/(self.num_classes*self.num_imgs_per_class)
+		self.pop_var  = self.pop_var/(self.num_classes*self.num_imgs_per_class)
 		pickle.dump(labels,open(self.labels,'wb'))		
 		self._save_settings()

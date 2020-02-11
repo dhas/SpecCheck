@@ -18,6 +18,8 @@ class QuickDraw():
 		self.bin_files = list(self.root_dir.glob('*.bin'))
 		self.num_classes = len(self.bin_files)
 		self.min_sz = min_sz
+		self.pop_mean = 0
+		self.pop_var  = 0
 		if self._settings_changed():
 			self._extract_dataset()
 
@@ -36,6 +38,8 @@ class QuickDraw():
 		settings['num_imgs_per_class'] = self.num_imgs_per_class
 		settings['img_side'] = self.img_side
 		settings['bin_files'] = [str(f) for f in self.bin_files]
+		settings['mean'] = self.pop_mean
+		settings['variance'] = self.pop_var
 		with open(self.settings,'w') as f:
 			f.write(json.dumps(settings))
 
@@ -88,6 +92,8 @@ class QuickDraw():
 			vector_images.append(drawing['image'])
 
 		y_class = []
+		mu_class = 0
+		var_class = 0
 		rand_idx = np.random.randint(0,len(vector_images),size=num_imgs)
 		for i in tqdm(range(num_imgs)):
 			img = vector_to_raster([vector_images[rand_idx[i]]],side=side)[0]
@@ -95,7 +101,9 @@ class QuickDraw():
 			np.save(dir/('%d.npy' % i),img)
 			y = self.estimate_labels(img,class_name,self.min_sz)
 			y_class.append(y)
-		return y_class
+			mu_class  += img.mean()
+			var_class += img.var()
+		return y_class,(mu_class/self.num_imgs_per_class),(var_class/self.num_imgs_per_class)
 
 
 	def _extract_dataset(self):
@@ -108,13 +116,17 @@ class QuickDraw():
 			print('Extracting %s\n' % class_name)
 			class_dir = self.dataset / class_name				
 			class_dir.mkdir(exist_ok=False)
-			y_class = self._extract_to_npy(class_name,
+			y_class, mean, var = self._extract_to_npy(class_name,
 				self.bin_files[i],
 				class_dir,
 				self.num_imgs_per_class,
 				self.img_side)
-			y_est[class_name] = np.array(y_class)
+			self.pop_mean += mean
+			self.pop_var  += var
+			y_est[class_name] = np.array(y_class)			
 			print('')
 		
+		self.pop_mean = self.pop_mean/self.num_classes
+		self.pop_var  = self.pop_var/self.num_classes
 		pickle.dump(y_est,open(self.est_labels,'wb'))
 		self._save_settings()

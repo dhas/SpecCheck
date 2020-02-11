@@ -3,14 +3,14 @@ import pickle
 import json
 import torch
 from torch import nn, optim
-import torchvision.transforms as transforms
 from torchsummary import summary
 from draw import load
 from ood.encoder import Encoder
-from ood.train import EncoderTrainer
+from ood.train import EncoderTrainer,training_necessary
 from ood.explain import DatasetExplainer
 from utils import other_utils
 from config import config
+import numpy as np
 
 def read_settings(settings):
 	if settings.exists():
@@ -19,12 +19,6 @@ def read_settings(settings):
 			return settings
 	else:
 		return {}
-
-def training_necessary(checkpoint_path,cfg,cfg_path):	
-	training_needed = (not checkpoint_path.exists()) or \
-		(not cfg_path.exists()) or \
-		(cfg != pickle.load(open(cfg_path,'rb')))
-	return training_needed
 
 def get_optimizer(parameters,settings):
 	if settings['optim'] == 'Adam':
@@ -44,15 +38,13 @@ def main(project_root,out_dir):
 
 	dataset_dir = Path(draw_cfg['root'])/draw_cfg['qd']['root']/'dataset'
 	dataset_settings = read_settings(dataset_dir/'settings.json')
+	dataset_trans = load.get_transformations(dataset_settings['mean'],dataset_settings['variance'])
 
 	input_shape = (1,draw_cfg['img_side'],draw_cfg['img_side'])
 
-
 	train_params = enc_cfg['train']
 
-	trans = transforms.Compose([
-		transforms.Lambda(lambda x:x.permute(2,0,1).type(torch.FloatTensor))
-	])
+	
 	criterion = nn.CrossEntropyLoss()
 
 	device = torch.device('cuda')
@@ -74,7 +66,7 @@ def main(project_root,out_dir):
 		train_loader,val_loader = load.get_npy_train_loader(dataset_dir,
 			train_params['batch_size'],
 			train_params['batch_size'],
-			transforms=trans)	
+			transforms=dataset_trans)	
 
 		if not training_necessary(checkpoint_path,nets[net_name],cfg_path):
 			print('Encoder %s already trained' % net_name)
@@ -90,22 +82,37 @@ def main(project_root,out_dir):
 					train_params)
 			trainer.fit(checkpoint_path)
 			pickle.dump(nets[net_name],open(cfg_path,'wb'))
+	
+		data_loader = load.get_npy_dataloader(dataset_dir,
+			100,
+			transforms=dataset_trans,
+			shuffle=False)	
+		explainer = DatasetExplainer(encoder,device,checkpoint_path)
+		labels_dict = pickle.load(open(dataset_dir/'est_labels.pkl','rb'))
+		_,qd_accuracy,_,qd_preds,_ = explainer.evaluate(device,criterion,data_loader,labels_dict)
 
-	# 	print('')
 		explainer = DatasetExplainer(encoder,device,checkpoint_path)		
 		specset_dir = Path(draw_cfg['root'])/draw_cfg['sd']['root']/'dataset'
+		specset_settings = read_settings(specset_dir/'settings.json')
+		specset_trans = load.get_transformations(specset_settings['mean'],specset_settings['variance'])
 		spec_loader = load.get_npy_dataloader(specset_dir,
 			100,
-			transforms=trans)
+			transforms=specset_trans,
+			shuffle=False)
 		
 		labels_dict = pickle.load(open(specset_dir/'labels.pkl','rb'))
-		loss,accuracy,anns,preds,ood_npys = explainer.evaluate(device,criterion,spec_loader,labels_dict)
+		_,sd_accuracy,anns,sd_preds,ood_npys = explainer.evaluate(device,criterion,spec_loader,labels_dict)
+		other_utils.plot_softmax_distributions(qd_preds,sd_preds,train_params['savedir']/'4_softmax_dist.png')
+		
+		np.savez(train_params['savedir']/'softmax_scores.npz', 
+			qd_preds=qd_preds,sd_preds=sd_preds)
+
 		misses_dict = other_utils.paths_to_indexes(ood_npys,spec_loader.dataset.classes)
 		other_utils.plot_label_spread(train_params['savedir']/'1_ood_hist.png',
 			labels_dict,
 			draw_cfg['img_side'],
 			misses_dict=misses_dict)
-		explainer.shap_explain(anns,preds,spec_loader.dataset.class_to_idx,train_params['savedir'])
+		explainer.shap_explain(anns,sd_preds,spec_loader.dataset.class_to_idx,train_params['savedir'])
 
 if __name__ == '__main__':
 	main(Path('./'), Path('./_outputs'))

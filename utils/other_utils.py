@@ -165,3 +165,21 @@ def get_annotations_for_batch(sample_npys,y_ann,class_to_idx):
 		
 	y_batch = np.stack([_path_to_ann(p) for p in sample_npys])
 	return y_batch
+
+def plot_softmax_distributions(id_preds, od_preds, savename, softmax_scores=False):
+	if not softmax_scores:
+		id_softmax = np.max(id_preds,axis=1)
+		od_softmax = np.max(od_preds,axis=1)
+	else:
+		id_softmax = id_preds
+		od_softmax = od_preds
+
+	bins = np.linspace(0.5,1.0,20)
+	fig,ax = plt.subplots(figsize=(20,15))
+	ax.hist(id_softmax,bins,alpha=0.5,label='id')
+	ax.hist(od_softmax,bins,alpha=0.5,label='od')
+	handles, labels = ax.get_legend_handles_labels()
+	fig.legend(handles, labels, bbox_to_anchor=[0.9, 1.0], loc='upper right')
+	fig.savefig(savename)
+
+

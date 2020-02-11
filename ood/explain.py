@@ -38,10 +38,10 @@ class DatasetExplainer:
 		ood_npys = []
 		with torch.no_grad():
 			for batch_idx, (data, target, fnames) in enumerate(tqdm(test_loader)):
+				anns.append(other_utils.get_annotations_for_batch(fnames,y_ann,test_loader.dataset.class_to_idx))
 				data, target = data.to(device), target.to(device)
 				output = self.model(data)
-				loss += criterion(output, target).item()  # sum up batch loss
-				anns.append(other_utils.get_annotations_for_batch(fnames,y_ann,test_loader.dataset.class_to_idx))
+				loss += criterion(output, target).item()  # sum up batch loss				
 				pred_l = output.argmax(dim=1, keepdim=True)
 				hit = pred_l.eq(target.view_as(pred_l)).cpu().numpy()
 				hits.append(hit)
