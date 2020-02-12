@@ -210,8 +210,8 @@ if __name__ == '__main__':
 
 	nets = enc_cfg['nets']
 
-	for net_name in nets: #['NET02']:
-		print('Processing net %s' % net_name)
+	for net_name in nets:#['NET02']:
+		print('\nProcessing net %s' % net_name)
 		encoder = Encoder(net_name,
 				draw_cfg['img_side'],
 				nets[net_name],
@@ -227,56 +227,14 @@ if __name__ == '__main__':
 			explainer = DatasetExplainer(encoder, checkpoint_path)
 			
 			T = [1, 10, 100, 1000]
-			HIT, LOG, ANN, FNM = explainer._evaluate_ts(CUDA_DEVICE,criterion,od_loader,
+			_, iLOG  = explainer._evaluate_ts(CUDA_DEVICE,criterion,id_loader,T=T)
+
+			oHIT, oLOG, oANN, _ = explainer._evaluate_ts(CUDA_DEVICE,
+				criterion,od_loader,
 				T=T, y_ann=od_ann_dict)
-			explainer.softmax_by_feature('1_softmax_by_feature_%s.png' % net_name,
-				T,ANN,LOG,figsize=(40,20))
-
-			# od_S_miss = od_S[np.where(od_hits == False)[0]]
-			# other_utils.plot_softmax_distributions(enc_prefix/enc_cfg['root']/net_name/'5_softmax_dist.png',
-			# 	id_S,od_S,
-			# 	od_misses=od_S_miss)
-			# data = np.load('data.npz')
-			# od_anns = data['od_anns']
-			# od_S = data['od_S']
-			# explainer.softmax_by_feature(enc_prefix/enc_cfg['root']/net_name/'6_softmax_by_feature.png',
-			# 	od_anns,od_S)
-			# shaps = explainer.softmax_shap_by_feature(od_anns,od_S)
-
-			# explainer.shap_explain(od_anns,
-			# 	od_S,
-			# 	od_loader.dataset.class_to_idx,
-			# 	enc_prefix/enc_cfg['root']/net_name)
-
-			# output = explainer._evaluate(CUDA_DEVICE,criterion,id_loader)
 			
+			explainer.softmax_distributions('1_softmax_%s.png' % net_name,
+				iLOG, oLOG, oHIT, T)
 			
-			# _,_,_,qd_preds,_ = explainer.evaluate(CUDA_DEVICE,criterion,id_loader,labels_dict)
-
-			# labels_dict = pickle.load(open(od_dir/'labels.pkl','rb'))
-			# _,_,_,sd_preds,_ = explainer.evaluate(CUDA_DEVICE,criterion,od_loader,labels_dict)
-			# other_utils.plot_softmax_distributions(qd_preds,sd_preds,
-			# 	enc_prefix/enc_cfg['root']/net_name/'5_explainer.png',
-			# 	softmax_scores=False)
-			
-			# id_softmax_base = base_test(encoder,
-			# 	criterion,
-			# 	CUDA_DEVICE,
-			# 	id_loader,
-			# 	N,			
-			# 	id_settings['variance'],
-			# 	T,
-			# 	eps,			
-			# 	score_dir)
-			
-			# other_utils.plot_softmax_distributions(id_S,id_S,
-			# 	enc_prefix/enc_cfg['root']/net_name/'5_odin_id.png',
-			# 	softmax_scores=True)
-
-			# other_utils.plot_softmax_distributions(softmax_id,softmax_od,
-			# 	enc_prefix/enc_cfg['root']/net_name/'5_odin_id.png',
-			# 	softmax_scores=True)
-
-			# other_utils.plot_softmax_distributions(odin_id,odin_od,
-			# 	enc_prefix/enc_cfg['root']/net_name/'5_odin_od.png',
-			# 	softmax_scores=True)
+			explainer.softmax_by_feature('2_softmax_by_feature_%s.png' % net_name,
+				T,oANN,oLOG,figsize=(40,20))			

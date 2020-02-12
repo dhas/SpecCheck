@@ -69,13 +69,36 @@ class DatasetExplainer:
 
 		return loss,accuracy, anns, preds, ood_npys
 	
+	def softmax_distributions(self, savename, iLOG, oLOG, oHIT, T, fontsize=20, figsize=(30,15)):
+		fig,axs = plt.subplots(len(T), 3, figsize=figsize)
+		bins = np.linspace(0.5,1.0,50)
+		for t_id in range(len(T)):
+			ax = axs[t_id,0]
+			iS = np.max(iLOG[t_id], axis=1)
+			ax.hist(iS,bins,alpha=0.5,color='blue')
+			ax.set_ylabel('T = %s' % T[t_id], fontdict={'fontsize': fontsize})
+			if t_id == 0:
+				ax.set_title('ID', fontdict={'fontsize': fontsize})
+			
+			ax = axs[t_id,1]
+			oS = np.max(oLOG[t_id],axis=1)
+			ax.hist(oS,bins,alpha=0.5,color='orange')
+			if t_id == 0:
+				ax.set_title('OD', fontdict={'fontsize': fontsize})
 
-	def softmax_by_feature(self, savename, T, anns, LOG, fontsize=20, figsize=(30,15)):
+			ax = axs[t_id,2]
+			oSMiss = oS[np.where(oHIT[t_id] == False)[0]]
+			ax.hist(oSMiss,bins,alpha=0.5,color='red')
+			if t_id == 0:
+				ax.set_title('OD-Misses', fontdict={'fontsize': fontsize})		
+		fig.savefig(savename)
+	
+	def softmax_by_feature(self, savename, T, ANN, LOG, fontsize=20, figsize=(30,15)):
 		fig,axs = plt.subplots(len(T),4,figsize=figsize)
 		for t_id in range(len(T)):			
 			s    = np.max(LOG[t_id],axis=1)			
 			ax = axs[t_id,0]
-			x0 = anns[:,self.COL_X0]
+			x0 = ANN[:,self.COL_X0]
 			ax.scatter(x0,s)
 			ax.set_ylim([0.5,1])
 			ax.set_ylabel('T = %s' % T[t_id], fontdict={'fontsize': fontsize})
@@ -83,21 +106,21 @@ class DatasetExplainer:
 				ax.set_title('X0', fontdict={'fontsize': fontsize})
 
 			ax = axs[t_id,1]
-			y0 = anns[:,self.COL_Y0]
+			y0 = ANN[:,self.COL_Y0]
 			ax.scatter(y0,s)
 			ax.set_ylim([0.5,1])
 			if t_id == 0:
 				ax.set_title('Y0', fontdict={'fontsize': fontsize})
 
 			ax = axs[t_id,2]
-			sz = anns[:,self.COL_SZ]
+			sz = ANN[:,self.COL_SZ]
 			ax.scatter(sz,s)
 			ax.set_ylim([0.5,1])
 			if t_id == 0:
 				ax.set_title('SZ', fontdict={'fontsize': fontsize})
 			
 			ax = axs[t_id,3]
-			br = anns[:,self.COL_BR]
+			br = ANN[:,self.COL_BR]
 			ax.scatter(br,s)
 			ax.set_ylim([0.5,1])
 			if t_id == 0:
