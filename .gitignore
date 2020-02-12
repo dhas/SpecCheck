@@ -9,6 +9,7 @@ datasets/
 *.png
 *.log
 *.bin
+**nohup**
 ~
 ~
 
