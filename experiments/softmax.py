@@ -210,7 +210,7 @@ if __name__ == '__main__':
 
 	nets = enc_cfg['nets']
 
-	for net_name in nets:#['NET02']:
+	for net_name in nets: #['NET02']:
 		print('\nProcessing net %s' % net_name)
 		encoder = Encoder(net_name,
 				draw_cfg['img_side'],
@@ -226,7 +226,9 @@ if __name__ == '__main__':
 		else:		
 			explainer = DatasetExplainer(encoder, checkpoint_path)
 			
-			T = [1, 10, 100, 1000]
+			# T = [1, 10, 100, 1000]
+			# T = [1, 0.1, 0.01]
+			T = np.linspace(0.1,1,num=10)
 			_, iLOG  = explainer._evaluate_ts(CUDA_DEVICE,criterion,id_loader,T=T)
 
 			oHIT, oLOG, oANN, _ = explainer._evaluate_ts(CUDA_DEVICE,

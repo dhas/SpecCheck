@@ -76,7 +76,7 @@ class DatasetExplainer:
 			ax = axs[t_id,0]
 			iS = np.max(iLOG[t_id], axis=1)
 			ax.hist(iS,bins,alpha=0.5,color='blue')
-			ax.set_ylabel('T = %s' % T[t_id], fontdict={'fontsize': fontsize})
+			ax.set_ylabel('T = %0.2f' % T[t_id], fontdict={'fontsize': fontsize})
 			if t_id == 0:
 				ax.set_title('ID', fontdict={'fontsize': fontsize})
 			
@@ -101,7 +101,7 @@ class DatasetExplainer:
 			x0 = ANN[:,self.COL_X0]
 			ax.scatter(x0,s)
 			ax.set_ylim([0.5,1])
-			ax.set_ylabel('T = %s' % T[t_id], fontdict={'fontsize': fontsize})
+			ax.set_ylabel('T = %0.2f' % T[t_id], fontdict={'fontsize': fontsize})
 			if t_id == 0:
 				ax.set_title('X0', fontdict={'fontsize': fontsize})
 
