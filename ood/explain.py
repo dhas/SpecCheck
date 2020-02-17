@@ -69,64 +69,7 @@ class DatasetExplainer:
 						
 
 		return loss,accuracy, anns, preds, ood_npys
-	
-	def softmax_distributions(self, savename, iLOG, oLOG, oHIT, T, fontsize=20, figsize=(30,15)):
-		fig,axs = plt.subplots(len(T), 3, figsize=figsize)
-		bins = np.linspace(0.5,1.0,50)
-		for t_id in range(len(T)):
-			ax = axs[t_id,0]
-			iS = np.max(iLOG[t_id], axis=1)
-			ax.hist(iS,bins,alpha=0.5,color='blue')
-			ax.set_ylabel('T = %0.2f' % T[t_id], fontdict={'fontsize': fontsize})
-			if t_id == 0:
-				ax.set_title('ID', fontdict={'fontsize': fontsize})
-			
-			ax = axs[t_id,1]
-			oS = np.max(oLOG[t_id],axis=1)
-			ax.hist(oS,bins,alpha=0.5,color='orange')
-			if t_id == 0:
-				ax.set_title('OD', fontdict={'fontsize': fontsize})
-
-			ax = axs[t_id,2]
-			oSMiss = oS[np.where(oHIT[t_id] == False)[0]]
-			ax.hist(oSMiss,bins,alpha=0.5,color='red')
-			if t_id == 0:
-				ax.set_title('OD-Misses', fontdict={'fontsize': fontsize})		
-		fig.savefig(savename)
-	
-	def softmax_by_feature(self, savename, T, ANN, LOG, fontsize=20, figsize=(30,15)):
-		fig,axs = plt.subplots(len(T),4,figsize=figsize)
-		for t_id in range(len(T)):
-			s    = np.max(LOG[t_id],axis=1)
-			ax = axs[t_id,0]
-			x0 = ANN[:,self.COL_X0]
-			ax.scatter(x0,s)
-			ax.set_ylim([0.5,1])
-			ax.set_ylabel('T = %0.2f' % T[t_id], fontdict={'fontsize': fontsize})
-			if t_id == 0:
-				ax.set_title('X0', fontdict={'fontsize': fontsize})
-
-			ax = axs[t_id,1]
-			y0 = ANN[:,self.COL_Y0]
-			ax.scatter(y0,s)
-			ax.set_ylim([0.5,1])
-			if t_id == 0:
-				ax.set_title('Y0', fontdict={'fontsize': fontsize})
-
-			ax = axs[t_id,2]
-			sz = ANN[:,self.COL_SZ]
-			ax.scatter(sz,s)
-			ax.set_ylim([0.5,1])
-			if t_id == 0:
-				ax.set_title('SZ', fontdict={'fontsize': fontsize})
-			
-			ax = axs[t_id,3]
-			br = ANN[:,self.COL_BR]
-			ax.scatter(br,s)
-			ax.set_ylim([0.5,1])
-			if t_id == 0:
-				ax.set_title('BR', fontdict={'fontsize': fontsize})
-		fig.savefig(savename)
+		
 
 	def softmax_explain(self, PRD, Y, T, savename, label=None, ANN=None, fontsize=20, figsize=(30,15), ood_scatter=False):
 		def _extract_with_label(PRD, ANN, Y, label):
@@ -295,48 +238,175 @@ class DatasetExplainer:
 		else:
 			return HIT, PRD
 
-	def _evaluate_odin(self,device,criterion,loader,T=1,eps=0.0014,var=1):
+	def _evaluate_odin_batch(self,device,criterion,test_loader,T=[1],eps=[0.1],var=1,y_ann=None):
 		self.model.to(device)
 		self.model.eval()
-		L  = []; H  = []
-		for j, data in enumerate(loader):
-			images, _, _ = data
-			inputs = Variable(images.cuda(device), requires_grad = True)
-			outputs = self.model(inputs)
-			nnOutputs = outputs.data.cpu()
-			nnOutputs = nnOutputs.numpy()
-			nnOutputs = nnOutputs[0]
-			nnOutputs = nnOutputs - np.max(nnOutputs)
-			nnOutputs = np.exp(nnOutputs)/np.sum(np.exp(nnOutputs))
-
-			# Using temperature scaling
-			outputs = outputs / T
 		
-			# Calculating the perturbation we need to add, that is,
-			# the sign of gradient of cross entropy loss w.r.t. input
-			maxIndexTemp = np.argmax(nnOutputs)
-			labels = Variable(torch.LongTensor([maxIndexTemp]).cuda(device), requires_grad=True)
-			loss = criterion(outputs, labels)
-			loss.backward()
-			# Normalizing the gradient to binary in {0, 1}
-			gradient =  torch.ge(inputs.grad.data, 0)
-			gradient = (gradient.float() - 0.5) * 2
-			# Normalizing the gradient to the same space of image
-			gradient[0][0] = (gradient[0][0] )/(np.sqrt(var))
-			
-			# Adding small perturbations to images
-			tempInputs = torch.add(inputs.data,  -eps, gradient)
-			outputs = self.model(Variable(tempInputs))
-			outputs = outputs / T
-			# Calculating the confidence after adding perturbations
-			nnOutputs = outputs.data.cpu()
-			nnOutputs = nnOutputs.numpy()
-			nnOutputs = nnOutputs[0]
-			nnOutputs = nnOutputs - np.max(nnOutputs)
-			nnOutputs = np.exp(nnOutputs)/np.sum(np.exp(nnOutputs))
+		batch_size = test_loader.batch_size
 
-			L.append(nnOutputs)
-		return L
+		PRD = np.empty((len(eps),
+			len(T),
+			len(test_loader.dataset),
+			len(test_loader.dataset.classes)),
+		dtype=np.float)
+
+		HIT = np.empty((len(eps),
+			len(T),
+			len(test_loader.dataset),
+			1),
+		dtype=np.bool)
+
+		if not y_ann is None:
+			ANN = np.empty((len(test_loader.dataset),
+			6),
+			dtype=np.int)
+
+			FNM = np.empty((len(test_loader.dataset),
+				1),
+			dtype='<U10')
+			with_annotations = True
+		else:
+			with_annotations = False
+
+		for batch_id, (_x, _y, fnames) in enumerate(tqdm(test_loader)):
+			inputs = Variable(_x.cuda(device), requires_grad = True)			
+			outputs = self.model(inputs)
+			chunk = slice(batch_id*batch_size,(batch_id+1)*batch_size)
+			for t_ind in range(len(T)):
+				temper = T[t_ind]
+			
+				# Calculating the confidence of the output, no perturbation added here, no temperature scaling used
+				nnOutputs = outputs.data.cpu()
+				nnOutputs = nnOutputs.numpy()
+				# nnOutputs = nnOutputs[0]		
+				nnOutputs = nnOutputs - np.max(nnOutputs,axis=1).reshape(-1,1)
+								
+				nnOutputs = np.array([np.exp(nnOutput)/np.sum(np.exp(nnOutput)) for nnOutput in nnOutputs])				
+			
+
+				# Using temperature scaling
+				outputs = outputs / temper
+			
+				# Calculating the perturbation we need to add, that is,
+				# the sign of gradient of cross entropy loss w.r.t. input
+				maxIndexTemp = np.argmax(nnOutputs, axis=1)			
+				labels = Variable(torch.LongTensor(maxIndexTemp).cuda(device))			
+				loss = criterion(outputs, labels)
+				loss.backward()
+				
+				# Normalizing the gradient to binary in {0, 1}
+				gradient =  torch.ge(inputs.grad.data, 0)		
+				gradient = (gradient.float() - 0.5) * 2
+				
+				# Normalizing the gradient to the same space of image
+				gradient[0][0] = (gradient[0][0] )/(var)
+				
+				for e_ind in range(len(eps)):
+					epsilon = eps[e_ind]
+					# Adding small perturbations to images
+					tempInputs = torch.add(inputs.data,  -epsilon, gradient)
+					outputs = self.model(Variable(tempInputs))
+					outputs = outputs / temper
+					# Calculating the confidence after adding perturbations
+					nnOutputs = outputs.data.cpu()
+					nnOutputs = nnOutputs.numpy()
+					# nnOutputs = nnOutputs[0]
+					nnOutputs = nnOutputs - np.max(nnOutputs, axis=1).reshape(-1,1)
+					nnOutputs = np.array([np.exp(nnOutput)/np.sum(np.exp(nnOutput)) for nnOutput in nnOutputs])
+
+					PRD[e_ind,t_ind,chunk] = nnOutputs
+					HIT[e_ind,t_ind,chunk] = (np.argmax(nnOutputs, axis=1) == _y.numpy()).reshape(-1,1)
+				if with_annotations:
+					ANN[chunk] = other_utils.get_annotations_for_batch(
+						fnames,y_ann,test_loader.dataset.class_to_idx)
+					FNM[chunk] = np.array(fnames).reshape(-1,1)
+		
+		if with_annotations:
+			return HIT, PRD, ANN, FNM
+		else:
+			return HIT, PRD
+
+	def _evaluate_odin(self,device,criterion,test_loader,T=[1],eps=0.0014,var=1,y_ann=None):
+		self.model.to(device)
+		self.model.eval()
+		
+		
+		PRD = np.empty((len(T),
+			len(test_loader.dataset),
+			len(test_loader.dataset.classes)),
+		dtype=np.float)
+
+		HIT = np.empty((len(T),
+			len(test_loader.dataset),
+			1),
+		dtype=np.bool)
+
+		if not y_ann is None:
+			ANN = np.empty((len(test_loader.dataset),
+			6),
+			dtype=np.int)
+
+			FNM = np.empty((len(test_loader.dataset),
+				1),
+			dtype='<U10')
+			with_annotations = True
+		else:
+			with_annotations = False
+
+		for batch_id, (_x, _y, fnames) in enumerate(tqdm(test_loader)):
+			inputs = Variable(_x.cuda(device), requires_grad = True)			
+			outputs = self.model(inputs)		
+			
+			for t_ind in range(len(T)):
+				temper = T[t_ind]
+				# Calculating the confidence of the output, no perturbation added here, no temperature scaling used
+				nnOutputs = outputs.data.cpu()
+				nnOutputs = nnOutputs.numpy()
+				nnOutputs = nnOutputs[0]		
+				nnOutputs = nnOutputs - np.max(nnOutputs)		
+				nnOutputs = np.exp(nnOutputs)/np.sum(np.exp(nnOutputs))
+				
+
+				# Using temperature scaling
+				outputs = outputs / temper
+			
+				# Calculating the perturbation we need to add, that is,
+				# the sign of gradient of cross entropy loss w.r.t. input
+				maxIndexTemp = np.argmax(nnOutputs)
+				labels = Variable(torch.LongTensor([maxIndexTemp]).cuda(device))			
+				loss = criterion(outputs, labels)
+				loss.backward()
+				
+				# Normalizing the gradient to binary in {0, 1}
+				gradient =  torch.ge(inputs.grad.data, 0)		
+				gradient = (gradient.float() - 0.5) * 2
+				
+				# Normalizing the gradient to the same space of image
+				gradient[0][0] = (gradient[0][0] )/(var)
+				
+				# Adding small perturbations to images
+				tempInputs = torch.add(inputs.data,  -eps, gradient)
+				outputs = self.model(Variable(tempInputs))
+				outputs = outputs / temper
+				# Calculating the confidence after adding perturbations
+				nnOutputs = outputs.data.cpu()
+				nnOutputs = nnOutputs.numpy()
+				nnOutputs = nnOutputs[0]
+				nnOutputs = nnOutputs - np.max(nnOutputs)
+				nnOutputs = np.exp(nnOutputs)/np.sum(np.exp(nnOutputs))
+				PRD[t_ind,batch_id] = nnOutputs
+				HIT[t_ind,batch_id] = (np.argmax(nnOutputs) == _y.numpy())
+				if with_annotations:
+					ANN[batch_id] = other_utils.get_annotations_for_batch(
+						fnames,y_ann,test_loader.dataset.class_to_idx)[0]
+					FNM[batch_id] = np.array(fnames)[0]
+		
+		if with_annotations:
+			return HIT, PRD, ANN, FNM
+		else:
+			return HIT, PRD
+			
+
 	
 	def _evaluate(self,device,criterion,test_loader,y_ann=None):
 		self.model.to(device)
