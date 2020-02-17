@@ -62,10 +62,10 @@ sd_ann_dict	= pickle.load(open(sd_dir/'labels.pkl','rb'))
 
 batch_size 	= 100
 criterion 	= nn.CrossEntropyLoss()
-sd_loader 	= load.get_npy_dataloader(sd_dir,batch_size,transforms=sd_trans)
+sd_loader 	= load.get_npy_dataloader(sd_dir,batch_size,transforms=sd_trans,shuffle=False)
 
 nets = enc_cfg['nets']
-for net_name in ['NET02']: #nets: 
+for net_name in nets: #['NET02']: 
 	print('\nProcessing %s' % net_name)
 	encoder = Encoder(net_name,
 			draw_cfg['img_side'],
@@ -79,34 +79,21 @@ for net_name in ['NET02']: #nets:
 		raise Exception('Trained encoder unavailable')
 	else:		
 		explainer = DatasetExplainer(encoder, checkpoint_path)
-		T = np.linspace(1,20,5)
-		# _, PRD, ANN, _ = explainer._evaluate_ts(CUDA_DEVICE,criterion,sd_loader,T=T,y_ann=sd_ann_dict)
-		# YINOUT = np.array([ann_match(ann,sd_loader.dataset.classes) for ann in ANN])
-		# explainer.softmax_explain(PRD, YINOUT, T, out_dir/('%s.png' % net_name), figsize=(15,10))
-		# for label in range(len(sd_loader.dataset.classes)):
-		# 	explainer.softmax_explain(PRD, YINOUT, T,
-		# 		out_dir/('%s_%s.png' % (net_name, sd_loader.dataset.classes[label])),
-		# 		label=label, ANN=ANN)
+		eps = np.linspace(0,1,5)
+		T   = np.linspace(1,20,5)
 
-		# _, qH, qL, qanns, _ = explainer._evaluate(CUDA_DEVICE,criterion,qd_loader,y_ann=qd_ann_dict)
-		# _, sH, sL, sanns, _ = explainer._evaluate(CUDA_DEVICE,criterion,sd_loader,y_ann=sd_ann_dict)
-		# y_in_out = np.array([ann_match(sann,qanns,sd_loader.dataset.classes) for sann in sanns])
-		# fpr, tpr, thresholds = roc_curve(y_in_out, np.max(sL,axis=1), pos_label=1)
-
-		# sd_loader 	= load.get_npy_dataloader(sd_dir,1,transforms=sd_trans)
-		# explainer._evaluate_odin(CUDA_DEVICE,criterion,sd_loader,temper=1,eps=0.0014,var=sd_settings['variance'])
-		
-		sd_loader 	= load.get_npy_dataloader(sd_dir,100,transforms=sd_trans,shuffle=False)
-		eps = [0, 0.5]
 		_, PRD, ANN, _ = explainer._evaluate_odin_batch(CUDA_DEVICE,criterion,sd_loader,
 			T=T,eps=eps,
 			var=sd_settings['variance'],
 			y_ann=sd_ann_dict)
 
 		YINOUT = np.array([ann_match(ann,sd_loader.dataset.classes) for ann in ANN])
-		for e_ind in range(len(eps)):
-			explainer.softmax_explain(PRD[e_ind], YINOUT, T, out_dir/('%s_%f.png' % (net_name,eps[e_ind])), figsize=(15,10))
-			for label in range(len(sd_loader.dataset.classes)):
-				explainer.softmax_explain(PRD[e_ind], YINOUT, T,
-					out_dir/('%s_%s_%f.png' % (net_name, sd_loader.dataset.classes[label], eps[e_ind])),
-					label=label, ANN=ANN)
+		
+		for label in range(len(sd_loader.dataset.classes)):			
+			explainer.softmax_explain(PRD[0], YINOUT, T, 
+				out_dir/('%s_%s_eps_0.png' % (net_name, sd_loader.dataset.classes[label])), 				
+				label=label, ANN=ANN)
+
+			explainer.softmax_spread_explain(PRD, YINOUT, T, eps,
+				out_dir/('%s_%s.png' % (net_name, sd_loader.dataset.classes[label])),
+				label, ANN)

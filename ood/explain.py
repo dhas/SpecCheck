@@ -70,11 +70,85 @@ class DatasetExplainer:
 
 		return loss,accuracy, anns, preds, ood_npys
 		
+	def _extract_with_label(self,PRD, ANN, Y, label):
+		label_ind = np.where(ANN[:,self.COL_CL] == label)[0]
+		ANN = ANN[label_ind]
+		Y   = Y[label_ind]
+		if len(PRD.shape) > 3:
+			PRD = PRD[:,:,label_ind,:]
+		else:
+			PRD = PRD[:,label_ind,:]
 
-	def softmax_explain(self, PRD, Y, T, savename, label=None, ANN=None, fontsize=20, figsize=(30,15), ood_scatter=False):
-		def _extract_with_label(PRD, ANN, Y, label):
-			label_ind = np.where(ANN[:,self.COL_CL] == label)[0]
-			return PRD[:,label_ind,:], ANN[label_ind], Y[label_ind]			
+		return PRD, ANN, Y
+
+	def softmax_spread_explain(self, PRD, Y, T, eps, savename, label, ANN, fontsize=20, figsize=(30,15)):
+		def _extract_salience(F, scores):
+			uF = np.unique(F)
+			salience = []
+			for f in uF:
+				score = scores[F == f]
+				salience.append(score.max())
+			return uF, salience
+
+		pos_label = 1
+		neg_label = 0
+				
+		PRD, ANN, Y = self._extract_with_label(PRD, ANN, Y, label)		
+		
+		fig,axs = plt.subplots(len(eps), 4, figsize=figsize)
+		
+		X0  = ANN[:,self.COL_X0]
+		Y0  = ANN[:,self.COL_X0]
+		SZ  = ANN[:,self.COL_SZ]
+		BR  = ANN[:,self.COL_BR]
+		
+		for e_ind in range(len(eps)):
+			aX0 = axs[e_ind,0]
+			aX0.set_ylabel('eps-%0.2f' % eps[e_ind], fontsize=fontsize)
+			aY0 = axs[e_ind,1]
+			aSZ	= axs[e_ind,2]
+			aBR = axs[e_ind,3]
+
+			if e_ind == 0:
+				aX0.set_title('X0', fontsize=fontsize)
+				aY0.set_title('Y0', fontsize=fontsize)
+				aSZ.set_title('SZ', fontsize=fontsize)
+				aBR.set_title('BR', fontsize=fontsize)
+			
+			for t_ind in range(len(T)):
+				
+				SFM = np.max(PRD[e_ind][t_ind],axis=1)
+				
+				uX0, sX0 = _extract_salience(X0,SFM)
+				aX0.plot(uX0,sX0,label=('%2.2f' % T[t_ind]))
+				
+
+				uY0, sY0 = _extract_salience(Y0,SFM)
+				aY0.plot(uY0,sY0,label=('%2.2f' % T[t_ind]))
+				
+
+				uSZ, sSZ = _extract_salience(SZ,SFM)
+				aSZ.plot(uSZ,sSZ,label=('%2.2f' % T[t_ind]))
+				
+
+				uBR, sBR = _extract_salience(BR,SFM)
+				aBR.plot(uBR,sBR,label=('%2.2f' % T[t_ind]))
+
+			aX0.set_xticks(uX0[::2])
+			aY0.set_xticks(uY0[::2])
+			aSZ.set_xticks(uSZ)
+			aBR.set_xticks(uBR[::16])
+
+		handles, labels = aX0.get_legend_handles_labels()
+		fig.legend(handles, labels, fontsize=fontsize, loc='upper right')
+		fig.savefig(savename)
+			
+
+
+
+
+	
+	def softmax_explain(self, PRD, Y, T, savename, label=None, ANN=None, fontsize=20, figsize=(30,15), ood_scatter=False):		
 		
 		pos_label = 1
 		neg_label = 0
@@ -82,7 +156,7 @@ class DatasetExplainer:
 		if not label is None:
 			if ANN is None:
 				raise Exception('Annotations needed to explain by class label')
-			PRD, ANN, Y = _extract_with_label(PRD, ANN, Y, label)			
+			PRD, ANN, Y = self._extract_with_label(PRD, ANN, Y, label)			
 			c = 6
 		else:
 			c = 2
