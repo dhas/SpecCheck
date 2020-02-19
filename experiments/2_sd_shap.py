@@ -19,7 +19,6 @@ def read_settings(settings):
 	else:
 		return {}
 
-
 def ann_match(sann, classes):
 	qd_ann_range = {
 		'circle':{
@@ -47,13 +46,12 @@ def ann_match(sann, classes):
 
 CUDA_DEVICE = 0
 project_root = Path('../')
-out_dir = Path('_1_sd_softmax')
+out_dir = Path('_2_sd_shap')
 out_dir.mkdir(exist_ok=True)
 
 enc_prefix = project_root/'_outputs'
 draw_cfg = config.get_draw_config(project_root)
 enc_cfg  = config.get_encoders_config(project_root)
-
 
 sd_dir 		= project_root/draw_cfg['root']/draw_cfg['sd']['root']/'dataset'
 sd_settings = read_settings(sd_dir/'settings.json')
@@ -65,7 +63,7 @@ criterion 	= nn.CrossEntropyLoss()
 sd_loader 	= load.get_npy_dataloader(sd_dir,batch_size,transforms=sd_trans,shuffle=False)
 
 nets = enc_cfg['nets']
-for net_name in nets: #['NET02']: 
+for net_name in ['NET02']: #nets
 	print('\nProcessing %s' % net_name)
 	encoder = Encoder(net_name,
 			draw_cfg['img_side'],
@@ -78,22 +76,18 @@ for net_name in nets: #['NET02']:
 	if training_necessary(checkpoint_path,nets[net_name],cfg_path):
 		raise Exception('Trained encoder unavailable')
 	else:		
-		explainer = DatasetExplainer(encoder, checkpoint_path)
+		explainer = DatasetExplainer(encoder, checkpoint_path) 
 		eps = np.linspace(0,1,5)
 		T   = np.linspace(1,20,5)
-
 		_, PRD, ANN, _ = explainer._evaluate_odin_batch(CUDA_DEVICE,criterion,sd_loader,
 			T=T,eps=eps,
 			var=sd_settings['variance'],
 			y_ann=sd_ann_dict)
-
-		YINOUT = np.array([ann_match(ann,sd_loader.dataset.classes) for ann in ANN])
 		
-		for label in range(len(sd_loader.dataset.classes)):
-			explainer.softmax_explain(PRD[0], YINOUT, T, 
-				out_dir/('%s_%s_eps_0.png' % (net_name, sd_loader.dataset.classes[label])), 				
-				label=label, ANN=ANN)
+		YINOUT = np.array([ann_match(ann,sd_loader.dataset.classes) for ann in ANN])
 
-			explainer.softmax_spread_explain(PRD, YINOUT, T, eps,
-				out_dir/('%s_%s.png' % (net_name, sd_loader.dataset.classes[label])),
-				label, ANN)
+		for label in range(len(sd_loader.dataset.classes)):
+			explainer.shap_spread_explain(ANN,PRD,YINOUT,
+				eps, T, label, 
+				out_dir/('%s_%s.png' % (net_name,sd_loader.dataset.classes[label])),
+				eps0_savename=out_dir/('%s_%s_eps_0.png' % (net_name,sd_loader.dataset.classes[label])))

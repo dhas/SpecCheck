@@ -81,6 +81,20 @@ class DatasetExplainer:
 
 		return PRD, ANN, Y
 
+	def _extract_salience(self, F, scores, method='max'):
+			uF = np.unique(F)
+			salience = []
+			for f in uF:
+				score = scores[F == f]
+				if method == 'max':
+					s = score.max()
+				elif method == 'mean':
+					s = score.mean()
+
+				salience.append(s)
+			return uF, salience
+
+
 	def softmax_spread_explain(self, PRD, Y, T, eps, savename, label, ANN, fontsize=20, figsize=(30,15)):
 		def _extract_salience(F, scores):
 			uF = np.unique(F)
@@ -93,7 +107,7 @@ class DatasetExplainer:
 		pos_label = 1
 		neg_label = 0
 				
-		PRD, ANN, Y = self._extract_with_label(PRD, ANN, Y, label)		
+		PRD, ANN, Y = self._extract_with_label(PRD, ANN, Y, label)
 		
 		fig,axs = plt.subplots(len(eps), 4, figsize=figsize)
 		
@@ -145,6 +159,132 @@ class DatasetExplainer:
 			
 
 
+	def shap_spread_explain(self,ANN, PRD, Y, eps, T, label, savename, eps0_savename= None, ood_scatter=False, fontsize=20, figsize=(30,15)):		
+
+		pos_label = 1
+		neg_label = 0
+
+		PRD, ANN, Y = self._extract_with_label(PRD, ANN, Y, label)
+		
+		fig,axs = plt.subplots(len(eps), 4, figsize=figsize)
+		X0  = ANN[:,self.COL_X0]
+		Y0  = ANN[:,self.COL_X0]
+		SZ  = ANN[:,self.COL_SZ]
+		BR  = ANN[:,self.COL_BR]
+
+		ann_table = {'x0':ANN[:,self.COL_X0], 'y0':ANN[:,self.COL_Y0],
+			'sz':ANN[:,self.COL_SZ],'br':ANN[:,self.COL_BR]}
+		X = pd.DataFrame(ann_table)		
+		shap_lim = [-0.08,0.08]
+
+		for e_ind in range(len(eps)):			
+			aX0 = axs[e_ind,0]
+			aX0.set_ylabel('eps-%0.2f' % eps[e_ind], fontsize=fontsize)
+			aY0 = axs[e_ind,1]
+			aSZ	= axs[e_ind,2]
+			aBR = axs[e_ind,3]
+			aX0.set_ylim(shap_lim)
+			aY0.set_ylim(shap_lim)
+			aSZ.set_ylim(shap_lim)
+			aBR.set_ylim(shap_lim)
+
+			if e_ind == 0:
+				aX0.set_title('X0', fontsize=fontsize)
+				aY0.set_title('Y0', fontsize=fontsize)
+				aSZ.set_title('SZ', fontsize=fontsize)
+				aBR.set_title('BR', fontsize=fontsize)
+				fig0,axs0 = plt.subplots(len(T), 4, figsize=figsize)			
+			
+			for t_ind in range(len(T)):
+				y = list(np.max(PRD[e_ind][t_ind],axis=1))
+				dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=y), 100)
+				SHAP = shap.TreeExplainer(dtree).shap_values(X)
+
+				uX0, sX0 = self._extract_salience(X0,SHAP[:,self.COL_X0-1],method='mean')
+				aX0.plot(uX0,sX0,label=('%2.2f' % T[t_ind]))
+				
+
+				uY0, sY0 = self._extract_salience(Y0,SHAP[:,self.COL_Y0-1],method='mean')
+				aY0.plot(uY0,sY0,label=('%2.2f' % T[t_ind]))
+				
+
+				uSZ, sSZ = self._extract_salience(SZ,SHAP[:,self.COL_SZ-1],method='mean')
+				aSZ.plot(uSZ,sSZ,label=('%2.2f' % T[t_ind]))
+				
+
+				uBR, sBR = self._extract_salience(BR,SHAP[:,self.COL_BR-1],method='mean')
+				aBR.plot(uBR,sBR,label=('%2.2f' % T[t_ind]))
+				if (not eps0_savename is None) and (e_ind == 0):					
+					ax0 = axs0[t_ind, 0]
+					ay0 = axs0[t_ind, 1]
+					asz = axs0[t_ind, 2]
+					abr = axs0[t_ind, 3]
+
+					if t_ind == 0:
+						ax0.set_title('X0', fontsize=fontsize)						
+						ay0.set_title('Y0', fontsize=fontsize)
+						asz.set_title('SZ', fontsize=fontsize)
+						abr.set_title('BR', fontsize=fontsize)					
+					ax0.set_ylabel('T-%0.2f' % T[t_ind], fontsize=fontsize)
+					ax0.set_ylim(shap_lim)
+					ay0.set_ylim(shap_lim)
+					asz.set_ylim(shap_lim)
+					abr.set_ylim(shap_lim)
+
+					ax0.scatter(X0,SHAP[:,self.COL_X0-1])					
+					ay0.scatter(Y0,SHAP[:,self.COL_Y0-1])
+					asz.scatter(SZ,SHAP[:,self.COL_SZ-1])
+					abr.scatter(BR,SHAP[:,self.COL_BR-1])
+
+
+			aX0.set_xticks(uX0[::2])
+			aY0.set_xticks(uY0[::2])
+			aSZ.set_xticks(uSZ)
+			aBR.set_xticks(uBR[::16])
+
+		if (not eps0_savename is None):
+			handles, labels = ax0.get_legend_handles_labels()
+			fig0.legend(handles, labels, fontsize=fontsize, loc='upper right')
+			fig0.savefig(eps0_savename)	
+
+		handles, labels = aX0.get_legend_handles_labels()
+		fig.legend(handles, labels, fontsize=fontsize, loc='upper right')
+		fig.savefig(savename)
+		
+		# for t_ind in range(len(T)):
+		# 	y = list(np.max(PRD[t_ind],axis=1))
+		# 	dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=y), 100)
+		# 	shaps = shap.TreeExplainer(dtree).shap_values(X)
+		# 	print(shaps.shape)
+		# 	ax = axs[t_ind, 0]		
+		# 	X0 	= ANN[:,self.COL_X0]
+		# 	sX0 = shaps[:,self.COL_X0-1]
+		# 	ax.scatter(X0,sX0)
+		# 	if ood_scatter:
+		# 		axs.scatter(X0[Y == neg_label], sX0[Y == neg_label], color='red')
+
+		# 	ax 	= axs[t_ind,1]
+		# 	Y0 	= ANN[:,self.COL_Y0]
+		# 	sY0 = shaps[:,self.COL_Y0-1]
+		# 	ax.scatter(Y0,sY0)
+		# 	if ood_scatter:
+		# 		axs.scatter(Y0[Y == neg_label], sY0[Y == neg_label], color='red')
+
+		# 	ax 	= axs[t_ind,2]
+		# 	SZ 	= ANN[:,self.COL_SZ]
+		# 	sSZ = shaps[:,self.COL_SZ-1]
+		# 	ax.scatter(SZ,sSZ)
+		# 	if ood_scatter:
+		# 		axs.scatter(SZ[Y == neg_label], sSZ[Y == neg_label], color='red')
+
+		# 	ax 	= axs[t_ind,3]
+		# 	BR 	= ANN[:,self.COL_BR]
+		# 	sBR = shaps[:,self.COL_BR-1]
+		# 	ax.scatter(BR,sBR)
+		# 	if ood_scatter:
+		# 		axs.scatter(BR[Y == neg_label], sBR[Y == neg_label], color='red')
+		
+		# fig.savefig(savename)
 
 
 	
@@ -164,12 +304,12 @@ class DatasetExplainer:
 		fig,axs = plt.subplots(len(T), c, figsize=figsize)
 		softmax_bins = np.linspace(0.5,1.0,50)		
 		
-		for t_ind in range(len(T)):						
+		for t_ind in range(len(T)):
 			#Distribution of softmax scores
 			ax = axs[t_ind,0]
 			SFM = np.max(PRD[t_ind],axis=1)			
 			ax.hist(SFM,softmax_bins, alpha = 0.8, color='blue') # all scores
-			ax.hist(SFM[Y == neg_label], softmax_bins, alpha = 0.8, color='red') #ood scores
+			# ax.hist(SFM[Y == neg_label], softmax_bins, alpha = 0.8, color='red') #ood scores
 			ax.set_ylim([0,len(SFM)])
 			ax.set_ylabel('T = %0.2f' % T[t_ind], fontdict={'fontsize': fontsize})
 			if t_ind == 0:
@@ -228,13 +368,56 @@ class DatasetExplainer:
 
 		fig.savefig(savename)
 
-	def softmax_shap_by_feature(self,anns,s):
-		ann_table = {'x':anns[:,self.COL_X0], 'y':anns[:,self.COL_Y0],
-			's':anns[:,self.COL_SZ],'b':anns[:,self.COL_BR]}
-		X = pd.DataFrame(ann_table)
-		dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(s)), 100)
-		shaps = shap.TreeExplainer(dtree).shap_values(X)
-		return shaps
+	def softmax_shap_by_feature(self,ANN, PRD, Y, T, label, savename, ood_scatter=False, fontsize=20, figsize=(30,15)):
+		pos_label = 1
+		neg_label = 0
+
+		label_ind 	= np.where(ANN[:,self.COL_CL] == label)[0]
+		ANN 		= ANN[label_ind]
+		Y 			= Y[label_ind]
+		PRD 		= PRD[:,label_ind,:]
+
+		ann_table = {'x0':ANN[:,self.COL_X0], 'y0':ANN[:,self.COL_Y0],
+			'sz':ANN[:,self.COL_SZ],'br':ANN[:,self.COL_BR]}
+		X = pd.DataFrame(ann_table)		
+		
+		fig,axs = plt.subplots(len(T), 4, figsize=figsize)
+		softmax_bins = np.linspace(0.5,1.0,50)
+		print(ANN.shape)
+		for t_ind in range(len(T)):
+			y = list(np.max(PRD[t_ind],axis=1))
+			dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=y), 100)
+			shaps = shap.TreeExplainer(dtree).shap_values(X)
+			print(shaps.shape)
+			ax = axs[t_ind, 0]		
+			X0 	= ANN[:,self.COL_X0]
+			sX0 = shaps[:,self.COL_X0-1]
+			ax.scatter(X0,sX0)
+			if ood_scatter:
+				axs.scatter(X0[Y == neg_label], sX0[Y == neg_label], color='red')
+
+			ax 	= axs[t_ind,1]
+			Y0 	= ANN[:,self.COL_Y0]
+			sY0 = shaps[:,self.COL_Y0-1]
+			ax.scatter(Y0,sY0)
+			if ood_scatter:
+				axs.scatter(Y0[Y == neg_label], sY0[Y == neg_label], color='red')
+
+			ax 	= axs[t_ind,2]
+			SZ 	= ANN[:,self.COL_SZ]
+			sSZ = shaps[:,self.COL_SZ-1]
+			ax.scatter(SZ,sSZ)
+			if ood_scatter:
+				axs.scatter(SZ[Y == neg_label], sSZ[Y == neg_label], color='red')
+
+			ax 	= axs[t_ind,3]
+			BR 	= ANN[:,self.COL_BR]
+			sBR = shaps[:,self.COL_BR-1]
+			ax.scatter(BR,sBR)
+			if ood_scatter:
+				axs.scatter(BR[Y == neg_label], sBR[Y == neg_label], color='red')
+		
+		fig.savefig(savename)
 
 
 	def shap_explain(self,anns,preds,class_to_idx,savedir):
