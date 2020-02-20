@@ -70,6 +70,15 @@ class DatasetExplainer:
 
 		return loss,accuracy, anns, preds, ood_npys
 		
+	def plot_softmax_distribution(self, PRD, savename, fontsize=20, figsize=(30,15)):
+		SFM = np.max(PRD,axis=1)
+		softmax_bins = np.linspace(0.5,1.0,50)
+		
+		fig, axs = plt.subplots(1,1,figsize=figsize)		
+		axs.hist(SFM,softmax_bins, alpha = 0.8, color='blue')
+		fig.savefig(savename)	
+
+	
 	def _extract_with_label(self,PRD, ANN, Y, label):
 		label_ind = np.where(ANN[:,self.COL_CL] == label)[0]
 		ANN = ANN[label_ind]
@@ -302,7 +311,7 @@ class DatasetExplainer:
 			c = 2
 
 		fig,axs = plt.subplots(len(T), c, figsize=figsize)
-		softmax_bins = np.linspace(0.5,1.0,50)		
+		softmax_bins = np.linspace(0.5,1.0,50)
 		
 		for t_ind in range(len(T)):
 			#Distribution of softmax scores
