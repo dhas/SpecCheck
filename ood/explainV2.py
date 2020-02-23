@@ -9,6 +9,56 @@ import torch
 from torch.autograd import Variable
 sys.path.append('..')
 from utils import other_utils
+from draw import annotations
+
+class BaselineExplainer:
+	def __init__(self,model,checkpoint_path):
+		checkpoint = torch.load(checkpoint_path)
+		model.load_state_dict(checkpoint['model_state_dict'])
+		self.model = model
+
+	def evaluate(self, device, criterion, loader, y_ann=None):
+		self.model.to(device)
+		self.model.eval()
+
+		PRD = np.empty((len(loader.dataset),
+			len(loader.dataset.classes)),
+		dtype=np.float)
+
+		HIT = np.empty((len(loader.dataset),
+			1),
+		dtype=np.bool)
+
+		if not y_ann is None:
+			ANN = np.empty((len(loader.dataset),
+			annotations.ANN_SZ),
+			dtype=np.int)
+			with_annotations = True
+		else:
+			with_annotations = False
+
+		batch_size = loader.batch_size
+		for batch_id, (_x, _y, fnames) in enumerate(tqdm(loader)):
+			inputs = _x.cuda(device)
+			outputs = self.model(inputs)
+			
+			nnOutputs = outputs.data.cpu()
+			nnOutputs = nnOutputs.numpy()
+			nnOutputs = nnOutputs - np.max(nnOutputs,axis=1).reshape(-1,1)								
+			nnOutputs = np.array(
+				[np.exp(nnOutput)/np.sum(np.exp(nnOutput)) for nnOutput in nnOutputs])
+			
+			chunk = slice(batch_id*batch_size,(batch_id+1)*batch_size)
+			PRD[chunk] = nnOutputs
+			HIT[chunk] = (np.argmax(nnOutputs, axis=1) == _y.numpy()).reshape(-1,1)
+			
+		if with_annotations:
+			return PRD, HIT, ANN
+		else:
+			return PRD, HIT
+
+
+
 
 class OdinExplainer:
 	def __init__(self, model, checkpoint_path, is_calibrated=False):
@@ -17,7 +67,7 @@ class OdinExplainer:
 		self.model 			= model
 		self.is_calibrated 	= is_calibrated		
 		self.ANN_COL_CL		= 0
-		self.FEATS  		= ['X0', 'Y0', 'SZ', 'BR']		
+		self.FEATS  		= ['X0', 'Y0', 'SZ', 'BR']
 		
 
 	def axes_softmax_distribution(self, PRD, HIT, T, axs, title, fontsize=20):
@@ -216,8 +266,8 @@ class OdinExplainer:
 					PRD[e_ind,t_ind,chunk] = nnOutputs
 					HIT[e_ind,t_ind,chunk] = (np.argmax(nnOutputs, axis=1) == _y.numpy()).reshape(-1,1)
 				if with_annotations:
-					ANN[chunk] = other_utils.get_annotations_for_batch(
-						fnames,y_ann,loader.dataset.class_to_idx)		
+					ANN[chunk] = annotations.get_annotations_for_batch(
+						fnames,y_ann)		
 		if with_annotations:
 			return PRD, HIT, ANN
 		else:

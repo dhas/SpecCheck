@@ -1,15 +1,37 @@
 #configuration for quick-draw and spec-draw
-root: '_datasets'
-img_side  : 28
-num_classes : 2
-qd : {
-  root : 'qd_shapes',
-  imgs_per_class : 25000,
-  bins : ['full_binary_circle.bin','full_binary_square.bin'],
-  bins_url : 'https://console.cloud.google.com/storage/quickdraw_dataset/full/binary/'
+main_root: '_datasets'
+sources  : 'sources'
+
+datasets : {
+      draw_28: {
+          root        : 'draw_28',
+          dim         : 28,
+          num_classes : 2,
+          qd : {
+            root            : 'qd_shapes',
+            imgs_per_class  : 25000,
+            sources         : ['full_binary_circle.bin','full_binary_square.bin'],
+            sources_url     : 'https://console.cloud.google.com/storage/quickdraw_dataset/full/binary/',
+            min_sz          : 4
+          },
+          sd : {
+            root : 'sd_shapes',
+            imgs_per_class : 5000,
+            draw_limits    : {sz_lo : 5, sz_hi : 10, br_lo : 100, br_hi : 255, th  : 1}
+          }
+      }
 }
-sd : {
-  root : 'sd_shapes',
-  imgs_per_class : 5000,
-  draw_limits    : {sz_lo : 5, sz_hi : 10, br_lo : 100, br_hi : 255, th  : 1}
-}
+
+# img_side  : 28
+# num_classes : 2
+# qd : {
+#   root : 'qd_shapes',
+#   imgs_per_class : 25000,
+#   bins : ['full_binary_circle.bin','full_binary_square.bin'],
+#   bins_url : 'https://console.cloud.google.com/storage/quickdraw_dataset/full/binary/'
+# }
+# sd : {
+#   root : 'sd_shapes',
+#   imgs_per_class : 5000,
+#   draw_limits    : {sz_lo : 5, sz_hi : 10, br_lo : 100, br_hi : 255, th  : 1}
+# }

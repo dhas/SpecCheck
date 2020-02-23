@@ -1,4 +1,5 @@
 import numpy as np
+import json
 import torch
 import torch
 from torchvision.datasets import DatasetFolder
@@ -25,6 +26,14 @@ class DrawDataset(DatasetFolder):
 		return sample, target, path
 
 
+
+def read_settings(settings):
+	if settings.exists():
+		with open(settings,'r') as f:
+			settings = json.loads(f.read())
+			return settings
+	else:
+		return {}
 
 
 def npy_loader(path):

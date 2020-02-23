@@ -1,6 +1,7 @@
 #configurations for encoder networks
 
-root: '_encoders'
+root    : '_encoders'
+dataset : 'draw_28'
 
 nets : {
     NET01 : {
