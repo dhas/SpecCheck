@@ -232,7 +232,3 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 	handles, labels = aLabSHAP[0,0].get_legend_handles_labels()
 	fLabSHAP.legend(handles, labels, fontsize=fontsize, loc='upper right')
 	fLabSHAP.savefig(explain_root/'2_shap_by_feature.png')
-
-
-
-

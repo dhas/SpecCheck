@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 from pathlib import Path
+import argparse
 from draw.annotations import plot_annotation_distribution
 from prepare_test import prepare_observed_set, prepare_coverage_set, prepare_encoders, explain_with_encoder_set
 from ood.explainV2 import get_feature_KL
@@ -44,14 +45,6 @@ def run_test(tests_root, sources, test_config):
 		test_cfg['dim'],
 		test_root, out_dir)
 
-
-
-
-
-
-
-
-
 if __name__ == '__main__':
 	main_cfg = load_config('config/config.yml')
 	tests_root = Path(main_cfg['tests_root'])
@@ -59,4 +52,11 @@ if __name__ == '__main__':
 	sources    = tests_root/main_cfg['sources']
 	sources.mkdir(exist_ok=True)
 	
-	run_test(tests_root, sources, 'config/test_draw_28.yml')
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--test_config', type=str, default='test')
+	args = parser.parse_args()
+
+	if Path(args.test_config).exists():
+		run_test(tests_root, sources, args.test_config)
+	else:
+		raise Exception('Config file %s does not exist' % args.test_config)
