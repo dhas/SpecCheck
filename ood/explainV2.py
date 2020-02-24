@@ -145,12 +145,10 @@ class OdinExplainer:
 				ax = axs[t_ind, f_ind]
 				ax.scatter(F, S)
 				uF = np.unique(F)
-				if f_ind < 2:
+				if len(uF) < 12:
 					x_ticks = uF
-				elif f_ind >=3 :
-					x_ticks = uF[::16]
 				else:
-					x_ticks = uF[::2]
+					x_ticks = uF[::len(uF)//12]				
 
 				ax.set_xticks(x_ticks)
 				if t_ind == 0:
@@ -193,7 +191,7 @@ class OdinExplainer:
 
 
 
-	def plot_shap_by_feature(self, PRD, ANN, label, eps, T, savename, fontsize=20, figsize=(30,15)):
+	def plot_shap_by_feature(self, PRD, ANN, label, eps, T, savename, softmax_scale=1, fontsize=20, figsize=(30,15)):
 		if PRD.shape[0] > 1:
 			raise Exception('Not supported for more than one eps value')
 
@@ -209,7 +207,7 @@ class OdinExplainer:
 		X = pd.DataFrame(ANN)
 		X.columns = self.FEATS
 		for t_ind in range(len(T)):
-			SFM = np.max(PRD[t_ind],axis=1)
+			SFM = np.max(PRD[t_ind],axis=1)*softmax_scale
 			dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(SFM)), 100)
 			SHAP[t_ind] = shap.TreeExplainer(dtree).shap_values(X)
 		return self._feature_scatter(SHAP, ANN, eps, T, savename, 'mean', fontsize, figsize)		

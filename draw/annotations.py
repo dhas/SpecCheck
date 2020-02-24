@@ -56,7 +56,7 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 	fig.savefig(savename)
 	plt.close()
 
-def plot_annotation_distribution(ANN, dim, savename, fontsize=20, figsize=(30,10)):
+def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, figsize=(30,10)):
 	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
 	for cname in class_to_label_dict:
 		clabel = class_to_label_dict[cname]
@@ -64,14 +64,32 @@ def plot_annotation_distribution(ANN, dim, savename, fontsize=20, figsize=(30,10
 		for f_ind in range(len(FEATS)):
 			f = cANN[:, f_ind]
 			ax = axs[clabel,f_ind]
-			hist, bins = np.histogram(f, bins=30)
+			hist, bins = np.histogram(f, bins=15)
 			freq = hist/np.sum(hist)
 			ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			ax.set_ylim([0,1])
 			# ax.hist(f, bins=30)
-			if FEATS[f_ind] == 'BR':
-				ax.set_xticks(np.arange(GRAY_MAX)[::16])
-			else:
-				ax.set_xticks(np.arange(dim)[::2])
+			if FEATS[f_ind] == 'SZ':
+				if cname == 'circle':
+					f_spread = np.arange(draw_lims['sz_lo'], draw_lims['sz_hi'] + 1)					
+					if len(f_spread) > 8:
+						ax.set_xticks(f_spread[::len(f_spread)//8])
+					else:
+						ax.set_xticks(f_spread)
+				else:
+					f_spread = np.arange(draw_lims['sz_lo'], 2*draw_lims['sz_hi'] + 1)
+					ax.set_xticks(f_spread[::len(f_spread)//16])			
+			elif FEATS[f_ind] == 'BR':
+				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
+				ax.set_xticks(f_spread[::len(f_spread)//12])
+			else: #X0 and Y0
+				if cname == 'circle':
+					f_spread = np.arange(draw_lims['sz_lo'], (dim - draw_lims['sz_lo']) + 1)
+					ax.set_xticks(f_spread[::len(f_spread)//8])
+				else:
+					f_spread = np.arange(0, (dim - draw_lims['sz_lo']) + 1)
+					ax.set_xticks(f_spread[::len(f_spread)//16])
+
 			if f_ind == 0:
 				ax.set_ylabel(cname, fontsize=fontsize)
 			if clabel == 0:

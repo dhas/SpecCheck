@@ -148,7 +148,10 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
 	num_features = len(annotations.FEATS)
-	fSFM, aSFM 			= plt.subplots(len(nets), 3, figsize=(30,10))
+	temp_spread  = 6
+	temp_exp     = np.flip(np.arange(-temp_spread, temp_spread + 1, 2))
+	fSFM, aSFM 	 = plt.subplots(len(nets), len(temp_exp), figsize=(30,10))
+	aSFM = aSFM.reshape(len(nets), len(temp_exp))
 	fLabSFM, aLabSFM 	= plt.subplots(num_classes, num_features, figsize=(30,10))
 	fLabSHAP, aLabSHAP 	= plt.subplots(num_classes, num_features, figsize=(30,10))
 
@@ -178,22 +181,30 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 				checkpoint = torch.load(cal_checkpoint_path)
 				cal_encoder.load_state_dict(checkpoint['model_state_dict'])
 
-			cal_T 	= cal_encoder.temperature.item() 
-			T 		= [cal_T, 1, 1/cal_T]
+			cal_T 	= cal_encoder.temperature.item()
+			if (abs(cal_T) > 1) and (abs(cal_T) < 2):
+				cal_T = 2.0
+			T       = np.sort([cal_T**p for p in temp_exp])
+			# T 		= [cal_T, 1, 1/cal_T]
 			eps     = [0]
-			net_npz = cal_encoders/('%s.npz' % net_name)
-			if not net_npz.exists():
+			net_npz = encoders_root/net_name/('%s.npz' % net_name)
+			state_changed = True
+			if (net_npz.exists()):
+				state = np.load(net_npz)
+				state['T']
+				if (len(state['T']) == len(T)) and (np.allclose(state['T'],T)):
+					cPRD  = state['cPRD']
+					cHIT  = state['cHIT']
+					ANN   = state['ANN']
+					state_changed = False
+			
+			if state_changed:
 				cPRD, cHIT, ANN = explainer.evaluate(CUDA_DEVICE,
 					criterion,sd_loader,
 					eps, T,
 					var=ds_settings['variance'],
 					y_ann=ds_ann_npy)
-				np.savez(net_npz,cPRD=cPRD, cHIT=cHIT, ANN=ANN)
-			else:
-				state = np.load(net_npz)
-				cPRD  = state['cPRD']
-				cHIT  = state['cHIT']
-				ANN   = state['ANN']
+				np.savez(net_npz, T=T, cPRD=cPRD, cHIT=cHIT, ANN=ANN)			
 
 			explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
 				T, aSFM[net_ind], 
@@ -208,7 +219,8 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 
 				SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
 					label, eps, T,
-					explain_root/('%s_2_shap_%s.png' % (net_name, label_name)))
+					explain_root/('%s_2_shap_%s.png' % (net_name, label_name)),
+					softmax_scale=1)
 
 				if label == 0:
 					set_title = True

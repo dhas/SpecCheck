@@ -29,8 +29,10 @@ def run_test(tests_root, sources, test_config):
 	
 	os_ann = np.load(test_root/os_cfg['root']/'labels.npy')
 	cs_ann = np.load(test_root/cs_cfg['root']/'labels.npy')
-	plot_annotation_distribution(os_ann, test_cfg['dim'], out_dir/'1_os_distribution.png')
-	plot_annotation_distribution(cs_ann, test_cfg['dim'], out_dir/'2_cs_distribution.png')
+	plot_annotation_distribution(os_ann, cs_cfg['draw_limits'], 
+		test_cfg['dim'], out_dir/'1_os_distribution.png')
+	plot_annotation_distribution(cs_ann, cs_cfg['draw_limits'], 
+		test_cfg['dim'], out_dir/'2_cs_distribution.png')
 
 	fkl = get_feature_KL(os_ann, cs_ann)
 	np.save(out_dir/'3_kl_by_feature.npy', fkl)
@@ -53,7 +55,7 @@ if __name__ == '__main__':
 	sources.mkdir(exist_ok=True)
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--test_config', type=str, default='test')
+	parser.add_argument('--test_config', type=str, required=True)
 	args = parser.parse_args()
 
 	if Path(args.test_config).exists():

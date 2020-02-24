@@ -38,7 +38,7 @@ def explain_with_encoder_set(project_root, ENCO_YML):
 	cal_encoders.mkdir(exist_ok=True)
 
 	nets = enc_cfg['nets']
-	fSFM, aSFM 			= plt.subplots(len(nets), 3, figsize=(30,10))
+	fSFM, aSFM 			= plt.subplots(len(nets), 3, figsize=(30,10))	
 	fLabSFM, aLabSFM 	= plt.subplots(2, 4, figsize=(30,10))
 	fLabSHAP, aLabSHAP 	= plt.subplots(2, 4, figsize=(30,10))
 
