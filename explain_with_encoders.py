@@ -37,9 +37,6 @@ def explain_with_encoder_set(project_root, ENCO_YML):
 	cal_encoders  = encoders_root/'cal_encoders'
 	cal_encoders.mkdir(exist_ok=True)
 
-	out_dir = encoders_root/'plots'
-	out_dir.mkdir(exist_ok=True)
-
 	nets = enc_cfg['nets']
 	fSFM, aSFM 			= plt.subplots(len(nets), 3, figsize=(30,10))
 	fLabSFM, aLabSFM 	= plt.subplots(2, 4, figsize=(30,10))
@@ -97,11 +94,11 @@ def explain_with_encoder_set(project_root, ENCO_YML):
 
 				SFM_summary = explainer.plot_softmax_by_feature(cPRD, ANN, 
 					label, eps, T,
-					out_dir/('%s_1_softmax_%s.png' % (net_name, label_name)))
+					explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)))
 
 				SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
 					label, eps, T,
-					out_dir/('%s_2_shap_%s.png' % (net_name, label_name)))
+					explain_root/('%s_2_shap_%s.png' % (net_name, label_name)))
 
 				if label == 0:
 					set_title = True
@@ -116,15 +113,15 @@ def explain_with_encoder_set(project_root, ENCO_YML):
 
 			net_ind += 1
 
-	fSFM.savefig(out_dir/'0_softmax.png')
+	fSFM.savefig(explain_root/'0_softmax.png')
 
 	handles, labels = aLabSFM[0,0].get_legend_handles_labels()
 	fLabSFM.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	fLabSFM.savefig(out_dir/'1_softmax_by_feature.png')
+	fLabSFM.savefig(explain_root/'1_softmax_by_feature.png')
 
 	handles, labels = aLabSHAP[0,0].get_legend_handles_labels()
 	fLabSHAP.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	fLabSHAP.savefig(out_dir/'2_shap_by_feature.png')
+	fLabSHAP.savefig(explain_root/'2_shap_by_feature.png')
 
 
 	

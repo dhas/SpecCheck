@@ -64,7 +64,10 @@ def plot_annotation_distribution(ANN, dim, savename, fontsize=20, figsize=(30,10
 		for f_ind in range(len(FEATS)):
 			f = cANN[:, f_ind]
 			ax = axs[clabel,f_ind]
-			ax.hist(f, bins=30)
+			hist, bins = np.histogram(f, bins=30)
+			freq = hist/np.sum(hist)
+			ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			# ax.hist(f, bins=30)
 			if FEATS[f_ind] == 'BR':
 				ax.set_xticks(np.arange(GRAY_MAX)[::16])
 			else:

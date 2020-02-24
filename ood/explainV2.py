@@ -11,6 +11,25 @@ sys.path.append('..')
 from utils import other_utils
 from draw import annotations
 
+def get_feature_KL(os_ann, cs_ann, eps=0.00001):
+	num_classes = len(annotations.classes)
+	num_feats = len(annotations.FEATS)
+	fkl = np.empty((num_classes, num_feats), 
+		dtype=np.float)
+	bins = 50
+	for clabel in range(num_classes):
+		os = os_ann[os_ann[:,annotations.ANN_COL_CL] == clabel, 1:]
+		cs = cs_ann[cs_ann[:,annotations.ANN_COL_CL] == clabel, 1:]
+		for f_ind in range(num_feats):
+			p, bins = np.histogram(os[:,f_ind], bins=50)
+			p = (p/np.sum(p)) + eps
+			q, bins = np.histogram(cs[:,f_ind], bins=50)
+			q = (q/np.sum(q)) + eps
+			fkl[clabel, f_ind] = np.sum(np.where(p != 0, p * np.log(p / q), 0))
+	return fkl
+
+
+
 class BaselineExplainer:
 	def __init__(self,model,checkpoint_path):
 		checkpoint = torch.load(checkpoint_path)
