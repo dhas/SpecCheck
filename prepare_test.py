@@ -148,7 +148,7 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
 	num_features = len(annotations.FEATS)
-	temp_spread  = 6
+	temp_spread  = 2
 	temp_exp     = np.flip(np.arange(-temp_spread, temp_spread + 1, 2))
 	fSFM, aSFM 	 = plt.subplots(len(nets), len(temp_exp), figsize=(30,10))
 	aSFM = aSFM.reshape(len(nets), len(temp_exp))

@@ -71,7 +71,7 @@ for net_name in nets: #['NET02']
 		
 		cal_encoder = ModelWithTemperature(encoder)
 		cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
-		if not cal_checkpoint_path.exists():			
+		if not cal_checkpoint_path.exists():
 			print('Calibrating')
 			cal_encoder.set_temperature(sd_loader)		
 			torch.save({'model_state_dict': cal_encoder.state_dict()},
