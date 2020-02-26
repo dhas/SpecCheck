@@ -139,7 +139,7 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 
 	batch_size 	= 100
 	criterion 	= nn.CrossEntropyLoss()
-	sd_loader 	= load.get_npy_dataloader(ds_root,batch_size,transforms=ds_trans,shuffle=False)
+	ds_loader 	= load.get_npy_dataloader(ds_root,batch_size,transforms=ds_trans,shuffle=False)
 
 	encoders_root = test_root/cfg['root']
 	cal_encoders  = encoders_root/'cal_encoders'
@@ -174,7 +174,7 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 			cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
 			if not cal_checkpoint_path.exists():			
 				print('Calibrating')
-				cal_encoder.set_temperature(sd_loader)		
+				cal_encoder.set_temperature(ds_loader)		
 				torch.save({'model_state_dict': cal_encoder.state_dict()},
 						cal_checkpoint_path)
 			else:
@@ -185,6 +185,7 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 			if (abs(cal_T) > 1) and (abs(cal_T) < 2):
 				cal_T = 2.0
 			T       = np.sort([cal_T**p for p in temp_exp])
+			# cal_T = 0.00001
 			# T 		= [cal_T, 1, 1/cal_T]
 			eps     = [0]
 			net_npz = encoders_root/net_name/('%s.npz' % net_name)
@@ -200,7 +201,7 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, fontsiz
 			
 			if state_changed:
 				cPRD, cHIT, ANN = explainer.evaluate(CUDA_DEVICE,
-					criterion,sd_loader,
+					criterion,ds_loader,
 					eps, T,
 					var=ds_settings['variance'],
 					y_ann=ds_ann_npy)
