@@ -17,7 +17,7 @@ ANN_COL_TH  = 5
 GRAY_MAX	= 255
 FEATS  		= ['X0', 'Y0', 'SZ', 'BR']
 	
-
+#hallelujah!!
 def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 	r = imgs.shape[0]
 	c = imgs.shape[1]	
