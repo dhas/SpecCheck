@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 classes    = ['circle', 'square']
+num_classes = len(classes)
 class_to_label_dict = {
 	'circle' : 0,
 	'square' : 1
