@@ -12,8 +12,8 @@ observed_set  : {
 
 coverage_set : {
   root : 'sd_shapes',
-  imgs_per_class : 5000,
-  draw_limits    : {sz_lo : 30, sz_hi : 60, br_lo : 100, br_hi : 255, th  : 5}
+  imgs_per_class : 5000,  
+  draw_limits    : {bbox_lo : [0,0,30,30], bbox_hi : [0,0,120,120], br_lo : 100, br_hi : 255, th  : 5}
 }
 
 encoders : {

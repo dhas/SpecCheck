@@ -15,7 +15,7 @@ ANN_COL_SZ  = 3
 ANN_COL_BR  = 4
 ANN_COL_TH  = 5
 GRAY_MAX	= 255
-FEATS  		= ['X0', 'Y0', 'SZ', 'BR']
+FEATS  		= ['xmin', 'ymin', 'xmax', 'ymax']
 	
 #hallelujah!!
 def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
