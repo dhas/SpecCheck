@@ -71,9 +71,9 @@ class SpecDraw:
 			x0 = np.zeros(self.num_imgs_per_class)
 			y0 = np.zeros(self.num_imgs_per_class)
 			if self.class_names[i] == 'circle':
-				#sz for circle is radius
-				sz = np.random.randint(low=sz_lo,high=sz_hi,size=self.num_imgs_per_class)
-				for s in np.arange(sz_lo,sz_hi):
+				#sz for circle is diameter
+				sz = np.random.randint(low=sz_lo//2,high=sz_hi//2,size=self.num_imgs_per_class)
+				for s in sz:
 					ind = np.where(sz == s)[0]
 					lo  = s
 					hi  = self.img_side - s
@@ -81,11 +81,11 @@ class SpecDraw:
 					y0[ind] = np.random.randint(low=lo,high=hi,size=ind.size)
 			else:
 				#sz for square is side length
-				sz = np.random.randint(low=sz_lo,high=2*sz_hi,size=self.num_imgs_per_class)
-				for s in np.arange(sz_lo,2*sz_hi):
+				sz = np.random.randint(low=sz_lo,high=sz_hi,size=self.num_imgs_per_class)
+				for s in sz:
 					ind = np.where(sz == s)[0]
 					lo = 0
-					hi = self.img_side-s
+					hi = self.img_side - s
 					x0[ind] = np.random.randint(low=lo,high=hi,size=ind.size)
 					y0[ind] = np.random.randint(low=lo,high=hi,size=ind.size)
 			labels.append(np.stack([cl,x0,y0,sz,br,th],axis=1))	
@@ -108,12 +108,12 @@ class SpecDraw:
 			y_class = y_draw[i]
 			for j in tqdm(range(y_class.shape[0])):
 				y = y_class[j]
-				shape = annotations_to_sample(y,self.img_side)
+				shape, ann = annotations_to_sample(y,self.img_side)
 				shape = shape.reshape(self.img_side,self.img_side,1)
 				np.save(class_dir/('%d.npy' % j),shape)
 				self.pop_mean += shape.mean()
 				self.pop_var  += shape.var()
-			labels.append(y_class) 
+				labels.append(ann) 
 		self.pop_mean = self.pop_mean/(self.num_classes*self.num_imgs_per_class)
 		self.pop_var  = self.pop_var/(self.num_classes*self.num_imgs_per_class)
 		np.save(self.labels,np.vstack(labels))

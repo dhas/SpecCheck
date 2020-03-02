@@ -57,38 +57,6 @@ class QuickDraw():
 		return settings_changed
 
 
-	def estimate_labels(self,x,shape,min_sz):		
-		nz  = np.transpose(np.nonzero(x))
-		x_min = np.min(nz[:,0])
-		x_max = np.max(nz[:,0])
-		y_min = np.min(nz[:,1])
-		y_max = np.max(nz[:,1])
-		br = int(np.mean(x[x>0]))
-		x_sp = (x_max - x_min)
-		y_sp = (y_max - y_min)
-
-		invalid_img = False
-
-		if shape == 'circle':
-			if x_sp < 2*min_sz or y_sp < 2*min_sz:
-				invalid_img = True
-			else:
-				x0 = x_min + (x_sp//2)
-				y0 = y_min + (y_sp//2)
-				sz = int(np.mean([x_sp,y_sp])/2)
-		else:
-			if x_sp < min_sz or y_sp < min_sz:
-				invalid_img = True
-			else:
-				x0 = x_min
-				y0 = y_min
-				sz = int(np.mean([x_sp, y_sp]))
-
-		if invalid_img:
-			return [0,0,0,0]
-		else:
-			return [x0,y0,sz,br]
-
 	def _extract_to_npy(self,class_name,fname,dir,num_imgs,side):
 		vector_images = []
 		for drawing in unpack_drawings(fname):

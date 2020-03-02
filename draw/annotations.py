@@ -15,9 +15,10 @@ ANN_COL_SZ  = 3
 ANN_COL_BR  = 4
 ANN_COL_TH  = 5
 GRAY_MAX	= 255
-FEATS  		= ['xmin', 'ymin', 'xmax', 'ymax']
+
+
+FEATS  = ['XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
 	
-#hallelujah!!
 def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 	r = imgs.shape[0]
 	c = imgs.shape[1]	
@@ -69,32 +70,35 @@ def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, fig
 			ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
 			ax.set_ylim([0,1])
 			# ax.hist(f, bins=30)
-			if FEATS[f_ind] == 'SZ':
-				if cname == 'circle':
-					f_spread = np.arange(draw_lims['sz_lo'], draw_lims['sz_hi'] + 1)					
-					if len(f_spread) > 8:
-						ax.set_xticks(f_spread[::len(f_spread)//8])
-					else:
-						ax.set_xticks(f_spread)
-				else:
-					f_spread = np.arange(draw_lims['sz_lo'], 2*draw_lims['sz_hi'] + 1)
-					ax.set_xticks(f_spread[::len(f_spread)//16])			
-			elif FEATS[f_ind] == 'BR':
+			# if FEATS[f_ind] == 'SZ':
+			# 	if cname == 'circle':
+			# 		f_spread = np.arange(draw_lims['sz_lo'], draw_lims['sz_hi'] + 1)					
+			# 		if len(f_spread) > 8:
+			# 			ax.set_xticks(f_spread[::len(f_spread)//8])
+			# 		else:
+			# 			ax.set_xticks(f_spread)
+			# 	else:
+			# 		f_spread = np.arange(draw_lims['sz_lo'], 2*draw_lims['sz_hi'] + 1)
+			# 		ax.set_xticks(f_spread[::len(f_spread)//16])			
+			if FEATS[f_ind] == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
 				ax.set_xticks(f_spread[::len(f_spread)//12])
-			else: #X0 and Y0
-				if cname == 'circle':
-					f_spread = np.arange(draw_lims['sz_lo'], (dim - draw_lims['sz_lo']) + 1)
-					ax.set_xticks(f_spread[::len(f_spread)//8])
-				else:
-					f_spread = np.arange(0, (dim - draw_lims['sz_lo']) + 1)
-					ax.set_xticks(f_spread[::len(f_spread)//16])
+			else: #coordinates
+				f_spread = np.arange(0, dim + 1)
+				ax.set_xticks(f_spread[::len(f_spread)//8])
+				# if cname == 'circle':
+				# 	f_spread = np.arange(0, dim + 1)
+				# 	ax.set_xticks(f_spread[::len(f_spread)//8])
+				# else:
+				# 	f_spread = np.arange(0, (dim - draw_lims['sz_lo']) + 1)
+				# 	ax.set_xticks(f_spread[::len(f_spread)//16])
 
 			if f_ind == 0:
 				ax.set_ylabel(cname, fontsize=fontsize)
 			if clabel == 0:
 				ax.set_title(FEATS[f_ind], fontsize=fontsize)
 	fig.savefig(savename)
+	plt.close()
 
 
 def get_annotations_for_batch(fnames, ANN):
@@ -127,7 +131,11 @@ def annotations_to_sample(ann, side):
 				err += x*2+1
 			if x>0:
 				break
-		return canvas
+		xmin, ymin = xm-r, ym-r
+		xmax, ymax = xm+r, ym+r
+		ann = [class_to_label_dict['circle'], 
+		xmin, ymin, xmax, ymax, br]
+		return canvas, ann
 
 	def _square_bresenham(x0,y0,r,br,side):
 		def _line_bresenham(canvas,x0,y0,x1,y1,br):    
@@ -150,18 +158,30 @@ def annotations_to_sample(ann, side):
 		_line_bresenham(canvas,x0,y0,x0+r,y0,br)
 		_line_bresenham(canvas,x0+r,y0,x0+r,y0+r,br)
 		_line_bresenham(canvas,x0,y0+r,x0+r,y0+r,br)
-		return canvas
+		xmin, ymin = x0, y0
+		xmax, ymax = x0+r, y0+r
+		ann = [class_to_label_dict['square'], 
+		xmin, ymin, xmax, ymax, br]
+		return canvas, ann
 
 
 	def _circle_opencv(xm,ym,r,br,t,side):
 		canvas = np.zeros(shape=(side,side))	
 		img = cv2.circle(canvas,(xm,ym),r,int(br),t)
-		return img
+		xmin, ymin = xm-r, ym-r
+		xmax, ymax = xm+r, ym+r
+		ann = [class_to_label_dict['circle'], 
+		xmin, ymin, xmax, ymax, br]
+		return img, ann
 
 	def _square_opencv(x0,y0,r,br,t,side):
 		canvas = np.zeros(shape=(side,side))	
 		img    = cv2.rectangle(canvas,(x0,y0),(x0+r,y0+r),int(br),t)
-		return img
+		xmin, ymin = x0, y0
+		xmax, ymax = x0+r, y0+r
+		ann = [class_to_label_dict['square'], 
+		xmin, ymin, xmax, ymax, br]
+		return img, ann
 
 	shape = classes[ann[ANN_COL_CL]]
 	x 	  = ann[ANN_COL_X0]
@@ -183,36 +203,50 @@ def annotations_to_sample(ann, side):
 		}
 		return switcher[shape](x,y,r,br,t,side)
 
+def size_of_bbox(bbox):
+	return np.sqrt((bbox[2] - bbox[0])**2 + (bbox[3] - bbox[1])**2)
+
+
 def annotations_from_sample(x, shape, min_sz):
 	nz  = np.transpose(np.nonzero(x))
-	x_min = np.min(nz[:,0])
-	x_max = np.max(nz[:,0])
-	y_min = np.min(nz[:,1])
-	y_max = np.max(nz[:,1])
+	y_min = np.min(nz[:,0])
+	y_max = np.max(nz[:,0])
+	x_min = np.min(nz[:,1])
+	x_max = np.max(nz[:,1])
 	br = int(np.mean(x[x>0]))
-	x_sp = (x_max - x_min)
-	y_sp = (y_max - y_min)
+	bbox = [class_to_label_dict[shape], x_min, y_min, x_max, y_max, br]
+	if size_of_bbox(bbox) < min_sz :
+		bbox = [class_to_label_dict[shape], 0, 0, 0, 0, 0]
+	return bbox
+	# nz  = np.transpose(np.nonzero(x))
+	# x_min = np.min(nz[:,0])
+	# x_max = np.max(nz[:,0])
+	# y_min = np.min(nz[:,1])
+	# y_max = np.max(nz[:,1])
+	# br = int(np.mean(x[x>0]))
+	# x_sp = (x_max - x_min)
+	# y_sp = (y_max - y_min)
 
-	invalid_img = False
+	# invalid_img = False
 
-	if shape == 'circle':		
-		if x_sp < 2*min_sz or y_sp < 2*min_sz:
-			invalid_img = True
-		else:
-			x0 = x_min + (x_sp//2)
-			y0 = y_min + (y_sp//2)
-			sz = int(np.mean([x_sp,y_sp])/2)
-	else:
-		if x_sp < min_sz or y_sp < min_sz:
-			invalid_img = True
-		else:
-			x0 = x_min
-			y0 = y_min
-			sz = int(np.mean([x_sp, y_sp]))
+	# if shape == 'circle':		
+	# 	if x_sp < 2*min_sz or y_sp < 2*min_sz:
+	# 		invalid_img = True
+	# 	else:
+	# 		x0 = x_min + (x_sp//2)
+	# 		y0 = y_min + (y_sp//2)
+	# 		sz = int(np.mean([x_sp,y_sp])/2)
+	# else:
+	# 	if x_sp < min_sz or y_sp < min_sz:
+	# 		invalid_img = True
+	# 	else:
+	# 		x0 = x_min
+	# 		y0 = y_min
+	# 		sz = int(np.mean([x_sp, y_sp]))
 
-	cl = class_to_label_dict[shape]
+	# cl = class_to_label_dict[shape]
 	
-	if invalid_img:
-		return [cl, 0, 0, 0, 0]
-	else:
-		return [cl, x0, y0, sz, br]
+	# if invalid_img:
+	# 	return [cl, 0, 0, 0, 0]
+	# else:
+	# 	return [cl, x0, y0, sz, br]
