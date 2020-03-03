@@ -85,8 +85,6 @@ class OdinExplainer:
 		model.load_state_dict(checkpoint['model_state_dict'])
 		self.model 			= model
 		self.is_calibrated 	= is_calibrated		
-		self.ANN_COL_CL		= 0
-		self.FEATS  		= ['X0', 'Y0', 'SZ', 'BR']
 		
 
 	def axes_softmax_distribution(self, PRD, HIT, T, axs, title, fontsize=20):
@@ -136,10 +134,10 @@ class OdinExplainer:
 	
 	def _feature_scatter(self, SCR, ANN, eps, T, savename, salience, fontsize, figsize):
 		summary = {}
-		fig, axs = plt.subplots(len(T), len(self.FEATS), figsize=figsize)
+		fig, axs = plt.subplots(len(T), len(annotations.FEATS), figsize=figsize)
 		for t_ind in np.arange(len(T)):
 			summary[t_ind] = {}
-			for f_ind in range(len(self.FEATS)):
+			for f_ind in range(len(annotations.FEATS)):
 				F  = ANN[:, f_ind]
 				S  = SCR[t_ind][:,f_ind]
 				ax = axs[t_ind, f_ind]
@@ -152,7 +150,7 @@ class OdinExplainer:
 
 				ax.set_xticks(x_ticks)
 				if t_ind == 0:
-					ax.set_title(self.FEATS[f_ind], fontsize=fontsize)
+					ax.set_title(annotations.FEATS[f_ind], fontsize=fontsize)
 				if f_ind == 0:
 					ax.set_ylabel('T-%0.3f' % T[t_ind], fontsize=fontsize)
 
@@ -170,16 +168,16 @@ class OdinExplainer:
 		if PRD.shape[0] > 1:
 			raise Exception('Not supported for more than one eps value')
 
-		label_ind = np.where(ANN[:,self.ANN_COL_CL] == label)[0]
-		ANN = ANN[label_ind,1:5] #excluding class label and thickness
+		label_ind = np.where(ANN[:,annotations.ANN_COL_CL] == label)[0]
+		ANN = ANN[label_ind,1:] #excluding class label and thickness		
 		PRD = PRD[:,:,label_ind,:]		
 		SFM   = np.expand_dims(np.max(PRD,axis=3),3)
-		SFM   = np.repeat(SFM,len(self.FEATS),axis=3)		
+		SFM   = np.repeat(SFM,len(annotations.FEATS),axis=3)		
 		SFM   = SFM[0] #only supports one eps
 		return self._feature_scatter(SFM, ANN, eps, T, savename, 'mean', fontsize, figsize)
 
 	def summary_by_feature(self, summary, T, cal_T_ind, net_name, axs, label, set_title=False, fontsize=20, figsize=(30,15)):
-		for f_ind in range(len(self.FEATS)):
+		for f_ind in range(len(annotations.FEATS)):
 			ax = axs[f_ind]
 			ax.plot(summary[cal_T_ind][f_ind]['f'],
 				summary[cal_T_ind][f_ind]['s'],
@@ -187,7 +185,7 @@ class OdinExplainer:
 			if f_ind == 0:
 				ax.set_ylabel(label, fontsize=fontsize)
 			if set_title:
-				ax.set_title(self.FEATS[f_ind], fontsize=fontsize)
+				ax.set_title(annotations.FEATS[f_ind], fontsize=fontsize)
 
 
 
@@ -195,17 +193,17 @@ class OdinExplainer:
 		if PRD.shape[0] > 1:
 			raise Exception('Not supported for more than one eps value')
 
-		label_ind = np.where(ANN[:,self.ANN_COL_CL] == label)[0]
-		ANN = ANN[label_ind,1:5] #excluding class label and thickness
+		label_ind = np.where(ANN[:,annotations.ANN_COL_CL] == label)[0]
+		ANN = ANN[label_ind,1:] #excluding class label and thickness
 		PRD = PRD[:,:,label_ind,:]
 		#only supports one eps
 		PRD = PRD[0]
 		SHAP = np.empty((len(T),
 			ANN.shape[0],
-			len(self.FEATS)),dtype=np.float)
+			len(annotations.FEATS)),dtype=np.float)
 		
 		X = pd.DataFrame(ANN)
-		X.columns = self.FEATS
+		X.columns = annotations.FEATS
 		for t_ind in range(len(T)):
 			SFM = np.max(PRD[t_ind],axis=1)*softmax_scale
 			dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(SFM)), 100)

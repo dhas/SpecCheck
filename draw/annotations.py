@@ -7,18 +7,19 @@ class_to_label_dict = {
 	'circle' : 0,
 	'square' : 1
 }
-ANN_SZ      = 6
-ANN_COL_CL  = 0
-ANN_COL_X0  = 1
-ANN_COL_Y0  = 2
+ANN_SZ      	= 6
+ANN_COL_CL  	= 0
+ANN_COL_XMIN  	= 1
+ANN_COL_YMIN  	= 2
 ANN_COL_SZ  = 3
 ANN_COL_BR  = 4
 ANN_COL_TH  = 5
 GRAY_MAX	= 255
 
-
+ANNS   = ['CL', 'XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
 FEATS  = ['XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
 	
+
 def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 	r = imgs.shape[0]
 	c = imgs.shape[1]	
@@ -41,19 +42,14 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 					ax.set_title('%s' % (labels[i][j][0]))
 				else:
 					show_xy = True
-					ax.set_title('%d,(%d,%d),%d,%d,%d' % (labels[i][j][ANN_COL_CL],
-						labels[i][j][ANN_COL_X0],
-						labels[i][j][ANN_COL_Y0],
-						labels[i][j][ANN_COL_SZ],
-						labels[i][j][ANN_COL_BR],
-						labels[i][j][ANN_COL_TH]),
+					ax.set_title('%s' % (','.join(['%d' % l for l in labels[i][j]])),
 						fontdict={'fontsize': fontsize//2})
 			ax.axis('off')
 	if show_xy:
 		fig.text(0.06, 0.5, 'x', va='center', rotation='vertical', fontsize=fontsize)
 		fig.text(0.5, 0.05, 'y', ha='center',fontsize=fontsize)
 	
-	fig.suptitle('%s' % class_to_label_dict)
+	fig.suptitle('%s, ANN-%s' % (class_to_label_dict, ANNS))
 	fig.savefig(savename)
 	plt.close()
 
