@@ -18,7 +18,7 @@ tests_root 	= out_dir/Path(main_cfg['tests_root'])
 tests_root.mkdir(exist_ok=True)
 sources    	= tests_root/main_cfg['sources']
 sources.mkdir(exist_ok=True)
-test_cfg 	= load_config('../config/test_draw_128.yml')
+test_cfg 	= load_config('../config/test_draw_28.yml')
 test_root   = tests_root/test_cfg['test_root']
 test_root.mkdir(exist_ok=True)
 os_cfg 		= test_cfg['observed_set']
@@ -53,9 +53,11 @@ annotations.plot_annotation_distribution(sd_ann,
 	out_dir/'2_sd_ann_dist.png')
 
 # plt.close()
+clabel = 0
 test_img = np.random.randint(0,100)
-x = np.load(sd_root/('square/%d.npy' % test_img))
-bbox = sd_ann[sd_ann[:,0] == 1][test_img]
+x = np.load(sd_root/('%s/%d.npy' % (annotations.classes[clabel], test_img)))
+bbox = sd_ann[sd_ann[:,0] == clabel][test_img]
+print(bbox)
 x_min,y_min = bbox[1], bbox[2]
 x_max,y_max = bbox[3], bbox[4]
 # nz  = np.transpose(np.nonzero(x))
@@ -65,7 +67,7 @@ x_max,y_max = bbox[3], bbox[4]
 # x_max = np.max(nz[:,1])
 # br = int(np.mean(x[x>0]))
 # bbox = [x_min,y_min,x_max,y_max]
-plt.imshow(x.reshape(128,128),cmap='Greys_r')
+plt.imshow(x.reshape(test_cfg['dim'],test_cfg['dim']),cmap='Greys_r')
 plt.plot([x_min,x_min],[y_min,y_max],color='red')
 plt.plot([x_min,x_max],[y_min,y_min],color='red')
 plt.plot([x_max,x_max],[y_min,y_max],color='red')

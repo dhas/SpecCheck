@@ -11,10 +11,12 @@ ANN_SZ      	= 6
 ANN_COL_CL  	= 0
 ANN_COL_XMIN  	= 1
 ANN_COL_YMIN  	= 2
-ANN_COL_SZ  = 3
-ANN_COL_BR  = 4
-ANN_COL_TH  = 5
-GRAY_MAX	= 255
+ANN_COL_X0      = 1
+ANN_COL_Y0      = 2
+ANN_COL_SZ  	= 3
+ANN_COL_BR  	= 4
+ANN_COL_TH  	= 5
+GRAY_MAX		= 255
 
 ANNS   = ['CL', 'XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
 FEATS  = ['XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
@@ -44,6 +46,13 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 					show_xy = True
 					ax.set_title('%s' % (','.join(['%d' % l for l in labels[i][j]])),
 						fontdict={'fontsize': fontsize//2})
+					bbox = labels[i][j]
+					x_min,y_min = bbox[1], bbox[2]
+					x_max,y_max = bbox[3], bbox[4]
+					ax.plot([x_min,x_min],[y_min,y_max],color='red')
+					ax.plot([x_min,x_max],[y_min,y_min],color='red')
+					ax.plot([x_max,x_max],[y_min,y_max],color='red')
+					ax.plot([x_min,x_max],[y_max,y_max],color='red')
 			ax.axis('off')
 	if show_xy:
 		fig.text(0.06, 0.5, 'x', va='center', rotation='vertical', fontsize=fontsize)
@@ -110,7 +119,8 @@ def get_annotations_for_batch(fnames, ANN):
 	return y_batch
 
 def annotations_to_sample(ann, side):
-	def _circle_bresenham(xm,ym,r,br,side):
+	def _circle_bresenham(ym,xm,r,br,side):
+		r0 = r
 		canvas = np.zeros(shape=(side,side))
 		x = -r; y = 0; err = 2-2*r #II. Quadrant
 		while True:		
@@ -127,8 +137,8 @@ def annotations_to_sample(ann, side):
 				err += x*2+1
 			if x>0:
 				break
-		xmin, ymin = xm-r, ym-r
-		xmax, ymax = xm+r, ym+r
+		xmin, ymin = ym - r0, xm - r0
+		xmax, ymax = ym + r0, xm + r0
 		ann = [class_to_label_dict['circle'], 
 		xmin, ymin, xmax, ymax, br]
 		return canvas, ann
@@ -164,8 +174,9 @@ def annotations_to_sample(ann, side):
 	def _circle_opencv(xm,ym,r,br,t,side):
 		canvas = np.zeros(shape=(side,side))	
 		img = cv2.circle(canvas,(xm,ym),r,int(br),t)
-		xmin, ymin = xm-r, ym-r
-		xmax, ymax = xm+r, ym+r
+		print(xm,ym,r)
+		xmin, ymin = xm - r, ym - r
+		xmax, ymax = xm + r, ym + r
 		ann = [class_to_label_dict['circle'], 
 		xmin, ymin, xmax, ymax, br]
 		return img, ann
@@ -186,6 +197,8 @@ def annotations_to_sample(ann, side):
 	br 	  = ann[ANN_COL_BR]
 	t     = ann[ANN_COL_TH]
 
+	
+	
 	if t == 1:
 		switcher = {
 			'circle': _circle_bresenham,
