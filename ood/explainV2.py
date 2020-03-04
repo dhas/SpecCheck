@@ -88,20 +88,36 @@ class OdinExplainer:
 		self.is_calibrated 	= is_calibrated		
 		
 
-	def axes_softmax_distribution(self, PRD, HIT, T, axs, title, fontsize=20):
-		softmax_bins = np.linspace(0.5,1.0,50)
+	def axes_softmax_distribution(self, PRD, HIT, T, axs, title, ANN=None, fontsize=20):
 		for t_ind in range(len(T)):
 			ax = axs[t_ind]
-			SFM = np.max(PRD[t_ind],axis=1)
-			ACC = np.count_nonzero(HIT[t_ind] == True)/(HIT[t_ind].size)
-			ax.hist(SFM,softmax_bins, label=('accuracy-%0.3f' % ACC), alpha = 0.8, color='blue')
-			ax.legend(fontsize=fontsize-4, loc='upper center')
-			ax.set_title('T-%0.2f' % T[t_ind], fontsize=fontsize)
-			ax.tick_params(axis='both', which='major', labelsize=fontsize-10)
-			if t_ind == 0:
-				ax.set_ylabel(title, fontsize=fontsize)	
+			if not ANN is None:
+				softmax_bins = np.linspace(0.0,1.0,50)
+				for clabel in range(annotations.num_classes):
+					cind = ANN[:,annotations.ANN_COL_CL] == clabel
+					prd  = PRD[t_ind][cind,clabel]
+					hist, bins = np.histogram(prd, bins=50)
+					freq = hist/np.sum(hist)
+					ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins),
+						alpha=0.5,
+						label='%s' % annotations.classes[clabel])
+					ax.set_xlim([0.0,1.2])
+					ax.set_ylim([0.0,1.0])
+					# ax.hist(prd,softmax_bins, alpha=0.5, label='%s' % annotations.classes[clabel])
+				ax.legend(fontsize=fontsize-4, loc='upper left')
+				ax.set_title('T-%0.2f' % T[t_ind], fontsize=fontsize)
+			else:
+				softmax_bins = np.linspace(0.5,1.0,50)
+				SFM = np.max(PRD[t_ind],axis=1)
+				ACC = np.count_nonzero(HIT[t_ind] == True)/(HIT[t_ind].size)
+				ax.hist(SFM,softmax_bins, label=('accuracy-%0.3f' % ACC), alpha = 0.8, color='blue')
+				ax.legend(fontsize=fontsize-4, loc='upper center')
+				ax.set_title('T-%0.2f' % T[t_ind], fontsize=fontsize)
+				ax.tick_params(axis='both', which='major', labelsize=fontsize-10)
+				if t_ind == 0:
+					ax.set_ylabel(title, fontsize=fontsize)	
 
-	def plot_softmax_distribution(self, PRD, HIT, eps, T, savename, fontsize=20, figsize=(30,15)):
+	def plot_softmax_distribution(self, PRD, HIT, eps, T, savename, ANN=None, fontsize=20, figsize=(30,15)):
 		softmax_bins = np.linspace(0.5,1.0,50)
 
 		fig, axs = plt.subplots(len(eps), len(T), figsize=figsize)
@@ -186,14 +202,17 @@ class OdinExplainer:
 				F  = ANN[:, f_ind]
 				S  = SCR[t_ind][:,f_ind]
 				ax = axs[t_ind, f_ind]
-				ax.scatter(F, S)
 				uF = np.unique(F)
-				if len(uF) < 12:
-					x_ticks = uF
+				if scores_x_axis:
+					ax.scatter(S,F)
 				else:
-					x_ticks = uF[::len(uF)//12]				
+					ax.scatter(F, S)					
+					if len(uF) < 12:
+						x_ticks = uF
+					else:
+						x_ticks = uF[::len(uF)//12]
+					ax.set_xticks(x_ticks)
 
-				ax.set_xticks(x_ticks)
 				if t_ind == 0:
 					ax.set_title(annotations.FEATS[f_ind], fontsize=fontsize)
 				if f_ind == 0:
@@ -209,7 +228,7 @@ class OdinExplainer:
 		fig.savefig(savename)
 		return summary
 
-	def plot_softmax_by_feature(self, PRD, ANN, label, eps, T, savename, fontsize=20, figsize=(30,15)):
+	def plot_softmax_by_feature(self, PRD, ANN, label, eps, T, savename, class_pred=False, fontsize=20, figsize=(30,15)):
 		if PRD.shape[0] > 1:
 			raise Exception('Not supported for more than one eps value')
 
@@ -234,7 +253,8 @@ class OdinExplainer:
 
 
 
-	def plot_shap_by_feature(self, PRD, ANN, label, eps, T, savename, softmax_scale=1, fontsize=20, figsize=(30,15)):
+	def plot_shap_by_feature(self, PRD, ANN, label, eps, T, savename, 
+		class_pred=False, softmax_scale=1, fontsize=20, figsize=(30,15)):
 		if PRD.shape[0] > 1:
 			raise Exception('Not supported for more than one eps value')
 
@@ -250,7 +270,10 @@ class OdinExplainer:
 		X = pd.DataFrame(ANN)
 		X.columns = annotations.FEATS
 		for t_ind in range(len(T)):
-			SFM = np.max(PRD[t_ind],axis=1)*softmax_scale
+			if class_pred:
+				SFM = PRD[t_ind,:,label]
+			else:
+				SFM = np.max(PRD[t_ind],axis=1)*softmax_scale
 			dtree = xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(SFM)), 100)
 			SHAP[t_ind] = shap.TreeExplainer(dtree).shap_values(X)
 		return self._feature_scatter(SHAP, ANN, eps, T, savename, 'mean', fontsize, figsize)		
