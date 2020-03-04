@@ -130,6 +130,7 @@ def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
 def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root, fontsize=20):
 	explain_root = explain_root/'encoder_explanations'
 	explain_root.mkdir(exist_ok=True)
+
 	CUDA_DEVICE = 0
 	ds_settings = load.read_settings(ds_root/'settings.json')
 	ds_trans    = load.get_transformations(ds_settings['mean'], 
@@ -140,23 +141,9 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 	criterion 	= nn.CrossEntropyLoss()
 	ds_loader 	= load.get_npy_dataloader(ds_root,batch_size,transforms=ds_trans,shuffle=False)
 
-	if cal_root is None:
-		cal_label = str(ds_root).split('/')[-1]
-		cal_loader = ds_loader
-	else:
-		cal_label 		= str(cal_root).split('/')[-1]
-		cal_settings 	= load.read_settings(cal_root/'settings.json')
-		cal_trans  		= load.get_transformations(cal_settings['mean'], 
-								cal_settings['variance'])
-		cal_loader 		= load.get_npy_dataloader(cal_root,batch_size,transforms=cal_trans,shuffle=False)
-
-
 	encoders_root = test_root/cfg['root']
-	cal_encoders  = encoders_root/('cal_encoders_%s' % cal_label)
+	cal_encoders  = encoders_root/'cal_encoders'
 	cal_encoders.mkdir(exist_ok=True)
-
-	explain_root = explain_root/('encoder_explanations_%s' % cal_label)
-	explain_root.mkdir(exist_ok=True)	
 
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
@@ -187,7 +174,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 			cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
 			if not cal_checkpoint_path.exists():			
 				print('Calibrating')
-				cal_encoder.set_temperature(cal_loader)		
+				cal_encoder.set_temperature(ds_loader)		
 				torch.save({'model_state_dict': cal_encoder.state_dict()},
 						cal_checkpoint_path)
 			else:
@@ -199,7 +186,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				cal_T = 2.0
 			T       = np.sort([cal_T**p for p in temp_exp])			
 			eps     = [0]
-			net_npz = encoders_root/net_name/('%s_%s.npz' % (net_name, cal_label))
+			net_npz = encoders_root/net_name/('%s.npz' % net_name)
 			state_changed = True
 			if (net_npz.exists()):
 				state = np.load(net_npz)
@@ -218,28 +205,21 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 					y_ann=ds_ann_npy)
 				np.savez(net_npz, T=T, cPRD=cPRD, cHIT=cHIT, ANN=ANN)			
 
-			if class_pred:
-				explainer.axes_softmax_distribution(cPRD[0], cHIT[0],
-					T, aSFM[net_ind], 
-					net_name,
-					ANN=ANN)
-			else:
-				explainer.axes_softmax_distribution(cPRD[0], cHIT[0],
-					T, aSFM[net_ind], 
-					net_name)
+			explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
+				T, aSFM[net_ind], 
+				net_name)
 
 			for label in range(len(annotations.classes)):
 				label_name = annotations.classes[label]
 
 				SFM_summary = explainer.plot_softmax_by_feature(cPRD, ANN, 
 					label, eps, T,
-					explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)),
-					class_pred=class_pred)
+					explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)))
 
 				SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
 					label, eps, T,
 					explain_root/('%s_2_shap_%s.png' % (net_name, label_name)),
-					class_pred=class_pred)
+					softmax_scale=1)
 
 				if label == 0:
 					set_title = True
