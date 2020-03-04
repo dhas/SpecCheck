@@ -44,6 +44,7 @@ def run_test(tests_root, sources, test_config):
 
 	cs_root = test_root/cs_cfg['root']
 	explain_with_encoder_set(enc_cfg, cs_root,
+		np.load(os_root/'labels.npy'),
 		test_cfg['dim'],
 		test_root, out_dir)
 

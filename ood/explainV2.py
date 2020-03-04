@@ -10,6 +10,7 @@ from torch.autograd import Variable
 sys.path.append('..')
 from utils import other_utils
 from draw import annotations
+from sklearn.metrics import auc
 
 def get_feature_KL(os_ann, cs_ann, eps=0.00001):
 	num_classes = len(annotations.classes)
@@ -129,6 +130,50 @@ class OdinExplainer:
 					if t_ind == 0:
 						ax.set_ylabel('eps-%0.2f' % eps[e_ind], fontsize=fontsize)
 
+		fig.savefig(savename)
+
+	
+	def _confusion_matrix(self, scores, id_ind, od_ind, threshold):
+		cmat = []
+		for t in threshold:
+			tpr = np.count_nonzero(scores[id_ind] > t)/len(id_ind)
+			fnr = np.count_nonzero(scores[id_ind] < t)/len(id_ind)
+			tnr = np.count_nonzero(scores[od_ind] < t)/len(od_ind)
+			fpr = np.count_nonzero(scores[od_ind] > t)/len(od_ind)
+			cmat.append([tpr, fnr, fpr, tnr])
+		return np.stack(cmat)
+
+
+	def roc_explain(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
+		id_ind = np.where(idod == annotations.id_label)[0]
+		od_ind = np.where(idod == annotations.od_label)[0]
+		fig, axs = plt.subplots(figsize=figsize)
+		mSFM  = np.max(PRD,axis=2)		
+		threshold = np.linspace(0.5,1, num=20)
+		
+		for t_ind in range(len(T)):
+			cmat =  self._confusion_matrix(mSFM[t_ind], id_ind, od_ind, threshold)			
+			axs.plot(cmat[:,2], cmat[:,0],
+				label='T-%0.3f, AUROC-%0.3f' % (T[t_ind],
+					auc(cmat[:,2], cmat[:,0])))
+		axs.legend(fontsize=fontsize-4, loc='upper center')		
+		fig.savefig(savename)
+
+		
+
+	def plot_inout_score_distributions(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
+		id_ind = np.where(idod == annotations.id_label)[0]
+		od_ind = np.where(idod == annotations.od_label)[0]
+		fig, axs = plt.subplots(2, len(T), figsize=figsize)		
+		mSFM  = np.max(PRD,axis=2)
+		for t_ind in range(len(T)):
+			ax = axs[0, t_ind]
+			ax.hist(mSFM[t_ind, id_ind], color='blue')
+			ax.set_xlim([0.5,1])
+
+			ax = axs[1, t_ind]
+			ax.hist(mSFM[t_ind, od_ind], color='red')
+			ax.set_xlim([0.5,1])
 		fig.savefig(savename)
 
 	

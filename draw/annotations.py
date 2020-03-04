@@ -7,6 +7,10 @@ class_to_label_dict = {
 	'circle' : 0,
 	'square' : 1
 }
+
+id_label = 0
+od_label = 1
+
 ANN_SZ      	= 6
 ANN_COL_CL  	= 0
 ANN_COL_XMIN  	= 1
@@ -104,6 +108,29 @@ def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, fig
 				ax.set_title(FEATS[f_ind], fontsize=fontsize)
 	fig.savefig(savename)
 	plt.close()
+
+def label_annotation_distribution(os_ann, cs_ann):
+	os_ann = os_ann[os_ann[:,1] != 0]
+	os_ann_min = []
+	os_ann_max = []
+	for f_ind in range(len(ANNS)):
+		if f_ind == 0:
+			continue		
+		os_ann_min.append(os_ann[:,f_ind].min())
+		os_ann_max.append(os_ann[:,f_ind].max())
+	idod = []	
+	for ann in cs_ann:
+		ann = ann[1:]
+		indis = ((os_ann_min[0] < ann[0]) and (os_ann_max[0] > ann[0])) and \
+				((os_ann_min[1] < ann[1]) and (os_ann_max[1] > ann[1])) and \
+				((os_ann_min[2] < ann[2]) and (os_ann_max[2] > ann[2])) and \
+				((os_ann_min[3] < ann[3]) and (os_ann_max[3] > ann[3])) and \
+				((os_ann_min[4] < ann[4]) and (os_ann_max[4] > ann[4]))
+		if indis:
+			idod.append(id_label)
+		else:
+			idod.append(od_label)		
+	return os_ann_min, os_ann_max, np.array(idod)
 
 
 def get_annotations_for_batch(fnames, ANN):
