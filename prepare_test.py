@@ -127,8 +127,9 @@ def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
 			trainer.fit(checkpoint_path)
 			pickle.dump(nets[net_name],open(cfg_path,'wb'))
 
-def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, class_pred=True, cal_root=None, fontsize=20):
-
+def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root, fontsize=20):
+	explain_root = explain_root/'encoder_explanations'
+	explain_root.mkdir(exist_ok=True)
 	CUDA_DEVICE = 0
 	ds_settings = load.read_settings(ds_root/'settings.json')
 	ds_trans    = load.get_transformations(ds_settings['mean'], 
@@ -194,8 +195,8 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, class_p
 				cal_encoder.load_state_dict(checkpoint['model_state_dict'])
 
 			cal_T 	= cal_encoder.temperature.item()
-			# if (abs(cal_T) > 1) and (abs(cal_T) < 2):
-			# 	cal_T = 2.0
+			if (abs(cal_T) > 1) and (abs(cal_T) < 2):
+				cal_T = 2.0
 			T       = np.sort([cal_T**p for p in temp_exp])			
 			eps     = [0]
 			net_npz = encoders_root/net_name/('%s_%s.npz' % (net_name, cal_label))
@@ -249,7 +250,11 @@ def explain_with_encoder_set(cfg, ds_root, dim, test_root, explain_root, class_p
 					net_name, aLabSFM[label], label_name, set_title=set_title)
 
 				explainer.summary_by_feature(SHAP_summary, T, len(T)-1,
-					net_name, aLabSHAP[label], label_name, set_title=set_title)
+					net_name, aLabSHAP[label], label_name, set_title=set_title)			
+			_, _, idod = annotations.label_annotation_distribution(os_ann, ANN)
+			explainer.roc_explain(cPRD[0], idod, T, explain_root/('%s_3_roc.png' % (net_name)))
+			explainer.plot_inout_score_distributions(cPRD[0], idod, T, 
+				explain_root/('%s_4_score_inout.png' % (net_name)))
 
 			net_ind += 1
 
