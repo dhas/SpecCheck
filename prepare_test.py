@@ -147,16 +147,9 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
-	num_features = len(annotations.FEATS)
-	temp_spread  = 2
-	temp_exp     = np.flip(np.arange(-temp_spread, temp_spread + 1, 2))
-	fSFM, aSFM 	 = plt.subplots(len(nets), len(temp_exp), figsize=(30,10))
-	aSFM = aSFM.reshape(len(nets), len(temp_exp))
-	fLabSFM, aLabSFM 	= plt.subplots(num_classes, num_features, figsize=(30,10))
-	fLabSHAP, aLabSHAP 	= plt.subplots(num_classes, num_features, figsize=(30,10))
-
+	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
 	net_ind = 0
-	for net_name in nets:
+	for net_name in ['VGG11']: #nets:
 		print('\nProcessing %s' % net_name)
 		encoder = Encoder(net_name,
 				dim,
@@ -170,80 +163,133 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 			raise Exception('Source encoder unavailable')
 		else:
 			explainer = OdinExplainer(encoder, checkpoint_path)
-			cal_encoder = ModelWithTemperature(encoder)
-			cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
-			if not cal_checkpoint_path.exists():			
-				print('Calibrating')
-				cal_encoder.set_temperature(ds_loader)		
-				torch.save({'model_state_dict': cal_encoder.state_dict()},
-						cal_checkpoint_path)
-			else:
-				checkpoint = torch.load(cal_checkpoint_path)
-				cal_encoder.load_state_dict(checkpoint['model_state_dict'])
-
-			cal_T 	= cal_encoder.temperature.item()
-			if (abs(cal_T) > 1) and (abs(cal_T) < 2):
-				cal_T = 2.0
-			T       = np.sort([cal_T**p for p in temp_exp])			
-			eps     = [0]
-			net_npz = encoders_root/net_name/('%s.npz' % net_name)
-			state_changed = True
-			if (net_npz.exists()):
-				state = np.load(net_npz)
-				state['T']
-				if (len(state['T']) == len(T)) and (np.allclose(state['T'],T)):
-					cPRD  = state['cPRD']
-					cHIT  = state['cHIT']
-					ANN   = state['ANN']
-					state_changed = False
-			
-			if state_changed:
-				cPRD, cHIT, ANN = explainer.evaluate(CUDA_DEVICE,
+			eps, T = [0], [1]
+			baseline_npz = encoders_root/net_name/('%s_baseline.npz' % net_name)
+			if not baseline_npz.exists():
+				PRD, HIT, ANN = explainer.evaluate(CUDA_DEVICE,
 					criterion,ds_loader,
 					eps, T,
 					var=ds_settings['variance'],
 					y_ann=ds_ann_npy)
-				np.savez(net_npz, T=T, cPRD=cPRD, cHIT=cHIT, ANN=ANN)			
+				np.savez(baseline_npz, PRD=PRD, HIT=HIT, ANN=ANN)
+			else:
+				baseline = np.load(baseline_npz)
+				PRD = baseline['PRD']
+				ANN = baseline['ANN']
+				HIT = baseline['HIT']
 
-			explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
-				T, aSFM[net_ind], 
-				net_name)
+			
+			_, _, benchmark_idod = annotations.label_annotation_distribution(os_ann, ANN)
+			calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)			
+			if calibrated_npz.exists():
+				state = np.load(calibrated_npz)
+				optT  = state['optT']
+				T     = state['T']
+				cPRD  = state['cPRD']
+				cHIT  = state['cHIT']
+			else:				
+				optT    = explainer.calibrate_for_highest_auroc(benchmark_idod, ds_loader)
+				T = np.hstack([np.linspace(1, 10, num=10), [optT]])
+				T = np.hstack([1/T[1:], T])
+				T.sort()
+				cPRD, cHIT, _ = explainer.evaluate(CUDA_DEVICE,
+					criterion,ds_loader,
+					eps, T,
+					var=ds_settings['variance'],
+					y_ann=ds_ann_npy)
+				np.savez(calibrated_npz, optT=optT, T=T, cPRD=cPRD, cHIT=cHIT)
 
-			for label in range(len(annotations.classes)):
-				label_name = annotations.classes[label]
+			
+			# explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
+			# 	T, aSFM[net_ind], 
+			# 	net_name)
+			aurocs = explainer.roc_explain(cPRD[0], benchmark_idod, T, explain_root/('%s_1_roc.png' % (net_name)),
+				explain_root/('%s_2_auroc.png' % (net_name)))
+			explainer.plot_inout_score_distributions(cPRD[0], benchmark_idod, T, 
+				explain_root/('%s_3_score_inout.png' % (net_name)),
+				figsize=(40,20))
 
-				SFM_summary = explainer.plot_softmax_by_feature(cPRD, ANN, 
-					label, eps, T,
-					explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)))
+			axAUROC.plot(T, aurocs, label=('%s' % net_name))
 
-				SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
-					label, eps, T,
-					explain_root/('%s_2_shap_%s.png' % (net_name, label_name)),
-					softmax_scale=1)
+			# cal_encoder = ModelWithTemperature(encoder)
+			# cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
+			# if not cal_checkpoint_path.exists():			
+			# 	print('Calibrating')
+			# 	cal_encoder.set_temperature(ds_loader)		
+			# 	torch.save({'model_state_dict': cal_encoder.state_dict()},
+			# 			cal_checkpoint_path)
+			# else:
+			# 	checkpoint = torch.load(cal_checkpoint_path)
+			# 	cal_encoder.load_state_dict(checkpoint['model_state_dict'])
 
-				if label == 0:
-					set_title = True
-				else:
-					set_title = False
+			# cal_T 	= cal_encoder.temperature.item()
+			# if (abs(cal_T) > 1) and (abs(cal_T) < 2):
+			# 	cal_T = 2.0
+			# T       = np.sort([cal_T**p for p in temp_exp])						
+			# eps     = [0]
+			# net_npz = encoders_root/net_name/('%s.npz' % net_name)
+			# state_changed = True
+			# if (net_npz.exists()):
+			# 	state = np.load(net_npz)				
+			# 	if (len(state['T']) == len(T)) and (np.allclose(state['T'],T)):
+			# 		cPRD  = state['cPRD']
+			# 		cHIT  = state['cHIT']
+			# 		ANN   = state['ANN']
+			# 		state_changed = False
+			
+			# if state_changed:
+			# 	cPRD, cHIT, ANN = explainer.evaluate(CUDA_DEVICE,
+			# 		criterion,ds_loader,
+			# 		eps, T,
+			# 		var=ds_settings['variance'],
+			# 		y_ann=ds_ann_npy)
+			# 	np.savez(net_npz, T=T, cPRD=cPRD, cHIT=cHIT, ANN=ANN)			
+
+			# explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
+			# 	T, aSFM[net_ind], 
+			# 	net_name)
+
+			# _, _, benchmark_idod = annotations.label_annotation_distribution(os_ann, ANN)
+			# optT    = explainer.calibrate_for_highest_auroc(benchmark_idod, ds_loader)			
+
+			# # for label in range(len(annotations.classes)):
+			# # 	label_name = annotations.classes[label]
+
+			# # 	SFM_summary = explainer.plot_softmax_by_feature(cPRD, ANN, 
+			# # 		label, eps, T,
+			# # 		explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)))
+
+			# # 	SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
+			# # 		label, eps, T,
+			# # 		explain_root/('%s_2_shap_%s.png' % (net_name, label_name)),
+			# # 		softmax_scale=1)
+
+			# # 	if label == 0:
+			# # 		set_title = True
+			# # 	else:
+			# # 		set_title = False
 				
-				explainer.summary_by_feature(SFM_summary, T, 0,
-					net_name, aLabSFM[label], label_name, set_title=set_title)
+			# # 	explainer.summary_by_feature(SFM_summary, T, 0,
+			# # 		net_name, aLabSFM[label], label_name, set_title=set_title)
 
-				explainer.summary_by_feature(SHAP_summary, T, len(T)-1,
-					net_name, aLabSHAP[label], label_name, set_title=set_title)			
-			_, _, idod = annotations.label_annotation_distribution(os_ann, ANN)
-			explainer.roc_explain(cPRD[0], idod, T, explain_root/('%s_3_roc.png' % (net_name)))
-			explainer.plot_inout_score_distributions(cPRD[0], idod, T, 
-				explain_root/('%s_4_score_inout.png' % (net_name)))
+			# # 	explainer.summary_by_feature(SHAP_summary, T, len(T)-1,
+			# # 		net_name, aLabSHAP[label], label_name, set_title=set_title)			
+			
+			# explainer.roc_explain(cPRD[0], benchmark_idod, T, explain_root/('%s_3_roc.png' % (net_name)),
+			# 	explain_root/('%s_4_auroc.png' % (net_name)))
+			# explainer.plot_inout_score_distributions(cPRD[0], benchmark_idod, T, 
+			# 	explain_root/('%s_5_score_inout.png' % (net_name)),
+			# 	figsize=(40,20))
 
 			net_ind += 1
 
-	fSFM.savefig(explain_root/'0_softmax.png')
+	axAUROC.legend(fontsize=fontsize-4, loc='lower right')
+	figAUROC.savefig(explain_root/'0_auroc.png')
 
-	handles, labels = aLabSFM[0,0].get_legend_handles_labels()
-	fLabSFM.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	fLabSFM.savefig(explain_root/'1_softmax_by_feature.png')
+	# handles, labels = aLabSFM[0,0].get_legend_handles_labels()
+	# fLabSFM.legend(handles, labels, fontsize=fontsize, loc='upper right')
+	# fLabSFM.savefig(explain_root/'1_softmax_by_feature.png')
 
-	handles, labels = aLabSHAP[0,0].get_legend_handles_labels()
-	fLabSHAP.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	fLabSHAP.savefig(explain_root/'2_shap_by_feature.png')
+	# handles, labels = aLabSHAP[0,0].get_legend_handles_labels()
+	# fLabSHAP.legend(handles, labels, fontsize=fontsize, loc='upper right')
+	# fLabSHAP.savefig(explain_root/'2_shap_by_feature.png')

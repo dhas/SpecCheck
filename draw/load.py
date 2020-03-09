@@ -3,7 +3,7 @@ import json
 import torch
 import torch
 from torchvision.datasets import DatasetFolder
-from torch.utils.data import DataLoader,random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision.transforms as transforms
 
 def get_transformations(mean,var):
@@ -12,6 +12,31 @@ def get_transformations(mean,var):
 				transforms.Normalize(mean=[mean], std=[np.sqrt(var)])
 		])
 	return trans
+
+
+class my_subset(Dataset):
+	"""r
+	Subset of a dataset at specified indices.
+
+	Arguments:
+		dataset (Dataset): The whole Dataset
+		indices (sequence): Indices in the whole set selected for subset
+		labels(sequence) : targets as required for the indices. will be the same length as indices
+	"""
+	def __init__(self, dataset, indices,labels):
+		self.dataset = dataset
+		self.indices = indices
+		labels_hold = torch.zeros(len(dataset)).type(torch.float) #( some number not present in the #labels just to make sure
+		labels_hold[self.indices] = labels 
+		self.labels = labels_hold
+	def __getitem__(self, idx):
+		image = self.dataset[self.indices[idx]][0]
+		label = self.labels[self.indices[idx]]
+		return (image, label)
+
+	def __len__(self):
+		return len(self.indices)
+
 
 class DrawDataset(DatasetFolder):	
 

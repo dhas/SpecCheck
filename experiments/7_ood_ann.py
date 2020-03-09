@@ -59,7 +59,7 @@ def label_sd_ann(qd_ann, sd_ann):
 	return qd_ann_min, qd_ann_max, np.array(idod)
 
 
-net_name = 'VGG07'
+net_name = 'VGG11'
 qd_ann = np.load(out_dir/'qd_labels.npy') #estimated annotations in QD
 net_npz = out_dir/('%s.npz' % net_name)
 print(qd_ann)
@@ -90,12 +90,23 @@ qd_ann_min, qd_ann_max, idod = label_sd_ann(qd_ann, sd_ann)
 id_ind = np.where(idod == 0)[0]
 od_ind = np.where(idod == 1)[0]
 
+idod_e = np.full(len(idod), 1.0)
+idod_e[od_ind] = 0.5
+
 fig, axs = plt.subplots(2, len(T), figsize=figsize)
 for t_ind in range(len(T)):	
-	ax     = axs[0,t_ind]	
-	ax.hist(sPRD[0,t_ind,id_ind], color='blue')	
+	ax     = axs[0,t_ind]
+	mse_id = np.square(1.0 - sPRD[0,t_ind,id_ind]).mean()
+	ax.hist(sPRD[0,t_ind,id_ind], color='blue')
+	ax.set_title('MSE-%0.3f' % mse_id)
+	mse = np.square(idod_e - sPRD[0,t_ind]).mean()
+	# ax.set_title('MSE-%0.3f' % mse)
+	
 	ax     = axs[1,t_ind]
+	mse_od = np.square(sPRD[0,t_ind,id_ind] - 0.5).mean()
 	ax.hist(sPRD[0,t_ind,od_ind], color='red')
+	ax.set_title('MSE-%0.3f' % mse_od)
+	print('T: %0.3f, MSE-id: %0.3f, MSE-od: %0.3f, MSE: %0.3f' % (T[t_ind],mse_id, mse_od, mse))
 
 fig.savefig(out_dir/'2_max_sfmax_idod.png')
 

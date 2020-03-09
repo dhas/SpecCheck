@@ -9,7 +9,8 @@ import torch
 from torch.autograd import Variable
 sys.path.append('..')
 from utils import other_utils
-from draw import annotations
+from draw import load, annotations
+from ood.calibration import ModelWithTemperature
 from sklearn.metrics import auc
 
 def get_feature_KL(os_ann, cs_ann, eps=0.00001):
@@ -144,36 +145,76 @@ class OdinExplainer:
 		return np.stack(cmat)
 
 
-	def roc_explain(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
+	def roc_explain(self, PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30,15)):
 		id_ind = np.where(idod == annotations.id_label)[0]
 		od_ind = np.where(idod == annotations.od_label)[0]
 		fig, axs = plt.subplots(figsize=figsize)
 		mSFM  = np.max(PRD,axis=2)		
 		threshold = np.linspace(0.5,1, num=20)
 		
-		for t_ind in range(len(T)):
-			cmat =  self._confusion_matrix(mSFM[t_ind], id_ind, od_ind, threshold)			
+		aurocs  = []
+		mses_id = []
+		mses_od = []
+
+		for i,t in enumerate(T):
+			cmat =  self._confusion_matrix(mSFM[i], id_ind, od_ind, threshold)
+			auroc = auc(cmat[:,2], cmat[:,0])
 			axs.plot(cmat[:,2], cmat[:,0],
-				label='T-%0.3f, AUROC-%0.3f' % (T[t_ind],
-					auc(cmat[:,2], cmat[:,0])))
-		axs.legend(fontsize=fontsize-4, loc='upper center')		
-		fig.savefig(savename)
+				label='T-%0.3f, AUROC-%0.3f' % (T[i],auroc))
+			aurocs.append(auroc)
+			mses_id.append(np.square(1.0 - mSFM[i,id_ind]).mean())
+			mses_od.append(np.square(mSFM[i,od_ind] - 0.5).mean())
+
+		axs.legend(fontsize=fontsize-4, loc='lower right')
+		fig.savefig(roc_savename)
+
+		fig,a0 = plt.subplots(figsize=figsize)
+		a0.plot(T, aurocs, label='auroc', color='blue')
+		a1 = a0.twinx()
+		a1.plot(T,mses_id, label='mse_id', color='orange')
+		a1.plot(T,mses_od, label='mse_od', color='green')
+
+		h1, l1 = a0.get_legend_handles_labels()
+		h2, l2 = a1.get_legend_handles_labels()
+		handles = h1 + h2
+		labels 	= l1 + l2		
+		# fig.legend(handles, labels, bbox_to_anchor=[0.9, 0.97], loc='upper right')
+		a0.legend(handles, labels,prop={'size': fontsize-4})		
+		fig.savefig(auroc_savename)
+		return aurocs
 
 		
+	def calibrate_for_highest_auroc(self, idod, cal_ds, batch_size=100):
+		idod_e = np.full(len(idod), 1.0)
+		idod_e[idod == annotations.od_label] = 0.5
+		idod_ds = load.my_subset(cal_ds.dataset, 
+			np.arange(0,len(cal_ds.dataset)),
+			torch.tensor(idod_e).type(torch.float))
+		idod_loader = torch.utils.data.DataLoader(idod_ds, 
+			batch_size=batch_size, shuffle=False)
+		cal_encoder = ModelWithTemperature(self.model)
+		cal_encoder.set_temperature(idod_loader)
+		return cal_encoder.temperature.item()
 
+	
 	def plot_inout_score_distributions(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
 		id_ind = np.where(idod == annotations.id_label)[0]
 		od_ind = np.where(idod == annotations.od_label)[0]
 		fig, axs = plt.subplots(2, len(T), figsize=figsize)		
 		mSFM  = np.max(PRD,axis=2)
-		for t_ind in range(len(T)):
-			ax = axs[0, t_ind]
-			ax.hist(mSFM[t_ind, id_ind], color='blue')
+		for i, t in enumerate(T):
+			ax = axs[0, i]
+			ax.hist(mSFM[i, id_ind], color='blue')
 			ax.set_xlim([0.5,1])
+			ax.set_title('T-%0.2f' % t, fontsize=fontsize)
+			mse_id = np.square(1.0 - mSFM[i,id_ind]).mean()
+			ax.set_xlabel('MSE-%0.3f' % mse_id, fontsize=fontsize)
 
-			ax = axs[1, t_ind]
-			ax.hist(mSFM[t_ind, od_ind], color='red')
+			ax = axs[1, i]
+			ax.hist(mSFM[i, od_ind], color='red')
 			ax.set_xlim([0.5,1])
+			mse_od = np.square(mSFM[i,od_ind] - 0.5).mean()
+			ax.set_xlabel('MSE-%0.3f' % mse_od, fontsize=fontsize)
 		fig.savefig(savename)
 
 	
