@@ -148,8 +148,11 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
 	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
+	figmSFM, axmSFM = plt.subplots(2, len(nets), figsize=(30,10))
+	figbROC, axbROC = plt.subplots(figsize=(30,10))
+	figtROC, axtROC = plt.subplots(figsize=(30,10))
 	net_ind = 0
-	for net_name in ['VGG11']: #nets:
+	for net_name in nets:
 		print('\nProcessing %s' % net_name)
 		encoder = Encoder(net_name,
 				dim,
@@ -177,9 +180,30 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				PRD = baseline['PRD']
 				ANN = baseline['ANN']
 				HIT = baseline['HIT']
-
 			
+
 			_, _, benchmark_idod = annotations.label_annotation_distribution(os_ann, ANN)
+			mSFM = np.max(PRD[0,0], axis=1)
+			
+			hist, bins = np.histogram(mSFM[benchmark_idod==annotations.id_label], bins=15)
+			freq = hist/np.sum(hist)
+			axmSFM[0, net_ind].bar(bins[:-1], freq, align="edge", width=np.diff(bins),
+				color='blue')
+			axmSFM[0, net_ind].set_ylim([0,1])
+			axmSFM[0, net_ind].set_title(net_name, fontsize=fontsize)
+
+			hist, bins = np.histogram(mSFM[benchmark_idod==annotations.od_label], bins=15)
+			freq = hist/np.sum(hist)
+			axmSFM[1, net_ind].bar(bins[:-1], freq, align="edge", width=np.diff(bins),
+				color='red')
+			axmSFM[1, net_ind].set_ylim([0,1])
+			
+			if net_ind == 0:
+				axmSFM[0, net_ind].set_ylabel('ID samples', fontsize=fontsize)
+				axmSFM[1, net_ind].set_ylabel('OOD samples', fontsize=fontsize)
+
+			explainer.roc_explain_ax(axbROC, mSFM, 
+				benchmark_idod, net_name)
 			calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)			
 			if calibrated_npz.exists():
 				state = np.load(calibrated_npz)
@@ -200,6 +224,10 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				np.savez(calibrated_npz, optT=optT, T=T, cPRD=cPRD, cHIT=cHIT)
 
 			
+			optT_mSFM = np.max(cPRD[0,T == optT][0], axis=1)
+
+			explainer.roc_explain_ax(axtROC, optT_mSFM, 
+				benchmark_idod, net_name)
 			# explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
 			# 	T, aSFM[net_ind], 
 			# 	net_name)
@@ -283,8 +311,21 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 
 			net_ind += 1
 
+	
+	figmSFM.savefig(explain_root/'0_baseline_certainty.png')
+
+	axbROC.legend(fontsize=fontsize-4, loc='lower right')
+	axbROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axbROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figbROC.savefig(explain_root/'1_baseline_roc.png')
+
+	axtROC.legend(fontsize=fontsize-4, loc='lower right')
+	axtROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axtROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figtROC.savefig(explain_root/'2_tscaling_roc.png')
+	
 	axAUROC.legend(fontsize=fontsize-4, loc='lower right')
-	figAUROC.savefig(explain_root/'0_auroc.png')
+	figAUROC.savefig(explain_root/'3_auroc.png')
 
 	# handles, labels = aLabSFM[0,0].get_legend_handles_labels()
 	# fLabSFM.legend(handles, labels, fontsize=fontsize, loc='upper right')

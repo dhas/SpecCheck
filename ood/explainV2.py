@@ -144,7 +144,15 @@ class OdinExplainer:
 			cmat.append([tpr, fnr, fpr, tnr])
 		return np.stack(cmat)
 
-
+	def roc_explain_ax(self, axs, mSFM, idod, net_name, fontsize=20, figsize=(30,15)):
+		id_ind = np.where(idod == annotations.id_label)[0]
+		od_ind = np.where(idod == annotations.od_label)[0]
+		threshold = np.linspace(0.5,1, num=20)
+		cmat =  self._confusion_matrix(mSFM, id_ind, od_ind, threshold)
+		auroc = auc(cmat[:,2], cmat[:,0])
+		axs.plot(cmat[:,2], cmat[:,0],
+				label='%s, AUROC-%0.3f' % (net_name,auroc))
+	
 	def roc_explain(self, PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30,15)):
 		id_ind = np.where(idod == annotations.id_label)[0]
 		od_ind = np.where(idod == annotations.od_label)[0]

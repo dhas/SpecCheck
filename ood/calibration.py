@@ -75,7 +75,7 @@ class ModelWithTemperature(nn.Module):
 			neg_mse = neg_mse_criterion(neg_scores, neg_labels)
 			loss = pos_mse + neg_mse
 			loss.backward()
-			print(loss.item(), pos_mse.item(), neg_mse.item(), self.temperature.item())
+			# print(loss.item(), pos_mse.item(), neg_mse.item(), self.temperature.item())
 			optim_steps.append([loss.item(), pos_mse.item(), neg_mse.item(), self.temperature.item()])			
 			return loss
 		
