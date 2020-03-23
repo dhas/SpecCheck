@@ -79,6 +79,45 @@ class BaselineExplainer:
 			return PRD, HIT
 
 
+def shap_by_feature(UNC, ANN, savename, fontsize=20, figsize=(30,15)):
+	SHAPS = []
+	fig, axs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)	
+	for cname in annotations.classes:
+		clabel 		= annotations.class_to_label_dict[cname]
+		cind   		= np.where(ANN[:,0] == clabel)[0]
+		X   		= pd.DataFrame(ANN[cind, 1:])
+		X.columns 	= annotations.FEATS
+		y   		= UNC[cind]				
+		dtree 		= xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(y)), 100)
+		SHAP 		= shap.TreeExplainer(dtree).shap_values(X)		
+		axs[clabel, 0].set_ylabel(cname, fontsize=fontsize)
+		for f, feat in enumerate(annotations.FEATS):
+			axs[clabel, f].scatter(X[feat], SHAP[:,f])
+			axs[clabel, f].set_title(feat, fontsize=fontsize)
+		SHAPS.append(SHAP)
+	fig.savefig(savename)
+	return np.stack(SHAPS)
+
+
+def mean_shap_by_feature(SHAP, ANN, net_name, axs, fontsize=20):	
+	for cname in annotations.classes:
+		clabel 	= annotations.class_to_label_dict[cname]
+		cind   	= np.where(ANN[:,0] == clabel)[0]
+		cANN    = ANN[cind, 1:]
+		shap 	= SHAP[clabel]
+		for f, feat in enumerate(annotations.FEATS):
+			F  = cANN[:, f]				
+			S  = shap[:,f]				
+			uF = np.unique(F)	
+			mS = [S[F == f].mean() for f in uF]				
+			axs[clabel, f].plot(uF, mS, label=net_name)
+			if clabel == 0:
+				axs[clabel, f].set_title(feat, fontsize=fontsize)
+			if f == 0:
+				axs[clabel, f].set_ylabel(cname, fontsize=fontsize)
+	
+				
+
 
 
 class OdinExplainer:
@@ -190,8 +229,8 @@ class OdinExplainer:
 		a0.legend(handles, labels,prop={'size': fontsize-4})		
 		fig.savefig(auroc_savename)
 		return aurocs
+			
 
-		
 	def calibrate_for_highest_auroc(self, idod, cal_ds, batch_size=100):
 		idod_e = np.full(len(idod), 1.0)
 		idod_e[idod == annotations.od_label] = 0.5

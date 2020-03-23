@@ -68,6 +68,7 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 	plt.close()
 
 def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, figsize=(30,10)):
+	ANN = ANN[~np.all(ANN[:,1:] == 0, axis=1)]
 	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
 	for cname in class_to_label_dict:
 		clabel = class_to_label_dict[cname]
