@@ -12,10 +12,8 @@ from utils import other_utils
 from ood.encoder import Encoder
 from ood.train import EncoderTrainer, training_necessary
 import ood.explainV2 as explain
-from ood.explainV2 import OdinExplainer
+from ood.explainV2 import TrainedModel
 import sys
-sys.path.append('../temperature_scaling/')
-from temperature_scaling import ModelWithTemperature
 
 def sources_available(sources,sources_url):
 	prefix_shown = False	
@@ -170,11 +168,11 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 		if training_necessary(checkpoint_path,nets[net_name],cfg_path):
 			raise Exception('Source encoder unavailable')
 		else:
-			explainer = OdinExplainer(encoder, checkpoint_path)
+			model = TrainedModel(encoder, checkpoint_path)
 			eps, T = [0], [1]
 			baseline_npz = encoders_root/net_name/('%s_baseline.npz' % net_name)
 			if not baseline_npz.exists():
-				PRD, HIT, ANN = explainer.evaluate(CUDA_DEVICE,
+				PRD, HIT, ANN = model.evaluate(CUDA_DEVICE,
 					criterion,ds_loader,
 					eps, T,
 					var=ds_settings['variance'],
@@ -210,11 +208,11 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				cPRD  = state['cPRD']
 				cHIT  = state['cHIT']
 			else:				
-				optT    = explainer.calibrate_for_highest_auroc(idod, ds_loader)
+				optT    = model.calibrate_for_highest_auroc(idod, ds_loader)
 				T = np.hstack([np.linspace(1, 10, num=10), [optT]])
 				T = np.hstack([1/T[1:], T])
 				T.sort()
-				cPRD, cHIT, _ = explainer.evaluate(CUDA_DEVICE,
+				cPRD, cHIT, _ = model.evaluate(CUDA_DEVICE,
 					criterion,ds_loader,
 					eps, T,
 					var=ds_settings['variance'],
@@ -232,7 +230,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 
 			aurocs = explain.roc_net(cPRD[0], idod, T, explain_root/('%s_3_roc.png' % (net_name)),
 				explain_root/('%s_4_auroc.png' % (net_name)))
-			# explainer.plot_inout_score_distributions(cPRD[0], idod, T, 
+			# model.plot_inout_score_distributions(cPRD[0], idod, T, 
 			# 	explain_root/('%s_3_score_inout.png' % (net_name)),
 			# 	figsize=(40,20))
 
