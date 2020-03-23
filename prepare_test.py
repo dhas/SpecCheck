@@ -11,6 +11,7 @@ from draw import load, annotations
 from utils import other_utils
 from ood.encoder import Encoder
 from ood.train import EncoderTrainer, training_necessary
+import ood.explainV2 as explain
 from ood.explainV2 import OdinExplainer
 import sys
 sys.path.append('../temperature_scaling/')
@@ -148,11 +149,15 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
 	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
-	figmSFM, axmSFM = plt.subplots(2, len(nets), figsize=(30,10))
-	figbROC, axbROC = plt.subplots(figsize=(30,10))
-	figtROC, axtROC = plt.subplots(figsize=(30,10))
-	net_ind = 0
-	for net_name in nets:
+	figBaseUNC, axBaseUNC = plt.subplots(2, len(nets), figsize=(30,10))
+	figCalUNC, axCalUNC = plt.subplots(2, len(nets), figsize=(30,10))
+	figBaseROC, axBaseROC = plt.subplots(figsize=(30,10))
+	figCalROC, axCalROC = plt.subplots(figsize=(30,10))
+	figBaseSHAP, axBaseSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
+	figCalSHAP, axCalSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
+
+	
+	for net_ind, net_name in enumerate(nets):
 		print('\nProcessing %s' % net_name)
 		encoder = Encoder(net_name,
 				dim,
@@ -182,28 +187,21 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				HIT = baseline['HIT']
 			
 
-			_, _, benchmark_idod = annotations.label_annotation_distribution(os_ann, ANN)
-			mSFM = np.max(PRD[0,0], axis=1)
+			_, _, idod = annotations.label_annotation_distribution(os_ann, ANN)			
 			
-			hist, bins = np.histogram(mSFM[benchmark_idod==annotations.id_label], bins=15)
-			freq = hist/np.sum(hist)
-			axmSFM[0, net_ind].bar(bins[:-1], freq, align="edge", width=np.diff(bins),
-				color='blue')
-			axmSFM[0, net_ind].set_ylim([0,1])
-			axmSFM[0, net_ind].set_title(net_name, fontsize=fontsize)
-
-			hist, bins = np.histogram(mSFM[benchmark_idod==annotations.od_label], bins=15)
-			freq = hist/np.sum(hist)
-			axmSFM[1, net_ind].bar(bins[:-1], freq, align="edge", width=np.diff(bins),
-				color='red')
-			axmSFM[1, net_ind].set_ylim([0,1])
-			
+			UNC = np.max(PRD[0,0], axis=1)
+			explain.uncertainty_summary(UNC, 
+				idod, net_name,
+				axBaseUNC[0, net_ind], axBaseUNC[1, net_ind])			
 			if net_ind == 0:
-				axmSFM[0, net_ind].set_ylabel('ID samples', fontsize=fontsize)
-				axmSFM[1, net_ind].set_ylabel('OOD samples', fontsize=fontsize)
+				axBaseUNC[0, net_ind].set_ylabel('ID samples', fontsize=fontsize)
+				axBaseUNC[1, net_ind].set_ylabel('OOD samples', fontsize=fontsize)
 
-			explainer.roc_explain_ax(axbROC, mSFM, 
-				benchmark_idod, net_name)
+			explain.roc_summary(UNC, idod, axBaseROC, net_name)
+			SHAP = explain.shap_by_feature(UNC, ANN, explain_root/('%s_1_bas_shap.png' % net_name))
+			explain.shap_summary(SHAP, ANN, net_name, axBaseSHAP)
+
+			
 			calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)			
 			if calibrated_npz.exists():
 				state = np.load(calibrated_npz)
@@ -212,7 +210,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 				cPRD  = state['cPRD']
 				cHIT  = state['cHIT']
 			else:				
-				optT    = explainer.calibrate_for_highest_auroc(benchmark_idod, ds_loader)
+				optT    = explainer.calibrate_for_highest_auroc(idod, ds_loader)
 				T = np.hstack([np.linspace(1, 10, num=10), [optT]])
 				T = np.hstack([1/T[1:], T])
 				T.sort()
@@ -223,114 +221,44 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 					y_ann=ds_ann_npy)
 				np.savez(calibrated_npz, optT=optT, T=T, cPRD=cPRD, cHIT=cHIT)
 
+						
+			calUNC    = np.max(cPRD[0,T == optT][0], axis=1)
+			explain.uncertainty_summary(calUNC, idod, 
+				net_name, axCalUNC[0, net_ind], axCalUNC[1, net_ind])
+			explain.roc_summary(calUNC, idod, axCalROC, net_name)
 			
-			optT_mSFM = np.max(cPRD[0,T == optT][0], axis=1)
+			SHAP = explain.shap_by_feature(calUNC, ANN, explain_root/('%s_2_cal_shap.png' % net_name))
+			explain.shap_summary(SHAP, ANN, net_name, axCalSHAP)
 
-			explainer.roc_explain_ax(axtROC, optT_mSFM, 
-				benchmark_idod, net_name)
-			# explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
-			# 	T, aSFM[net_ind], 
-			# 	net_name)
-			aurocs = explainer.roc_explain(cPRD[0], benchmark_idod, T, explain_root/('%s_1_roc.png' % (net_name)),
-				explain_root/('%s_2_auroc.png' % (net_name)))
-			explainer.plot_inout_score_distributions(cPRD[0], benchmark_idod, T, 
-				explain_root/('%s_3_score_inout.png' % (net_name)),
-				figsize=(40,20))
-
-			axAUROC.plot(T, aurocs, label=('%s' % net_name))
-
-			# cal_encoder = ModelWithTemperature(encoder)
-			# cal_checkpoint_path = cal_encoders/('%s.tar' % net_name)
-			# if not cal_checkpoint_path.exists():			
-			# 	print('Calibrating')
-			# 	cal_encoder.set_temperature(ds_loader)		
-			# 	torch.save({'model_state_dict': cal_encoder.state_dict()},
-			# 			cal_checkpoint_path)
-			# else:
-			# 	checkpoint = torch.load(cal_checkpoint_path)
-			# 	cal_encoder.load_state_dict(checkpoint['model_state_dict'])
-
-			# cal_T 	= cal_encoder.temperature.item()
-			# if (abs(cal_T) > 1) and (abs(cal_T) < 2):
-			# 	cal_T = 2.0
-			# T       = np.sort([cal_T**p for p in temp_exp])						
-			# eps     = [0]
-			# net_npz = encoders_root/net_name/('%s.npz' % net_name)
-			# state_changed = True
-			# if (net_npz.exists()):
-			# 	state = np.load(net_npz)				
-			# 	if (len(state['T']) == len(T)) and (np.allclose(state['T'],T)):
-			# 		cPRD  = state['cPRD']
-			# 		cHIT  = state['cHIT']
-			# 		ANN   = state['ANN']
-			# 		state_changed = False
-			
-			# if state_changed:
-			# 	cPRD, cHIT, ANN = explainer.evaluate(CUDA_DEVICE,
-			# 		criterion,ds_loader,
-			# 		eps, T,
-			# 		var=ds_settings['variance'],
-			# 		y_ann=ds_ann_npy)
-			# 	np.savez(net_npz, T=T, cPRD=cPRD, cHIT=cHIT, ANN=ANN)			
-
-			# explainer.axes_softmax_distribution(cPRD[0], cHIT[0], 
-			# 	T, aSFM[net_ind], 
-			# 	net_name)
-
-			# _, _, benchmark_idod = annotations.label_annotation_distribution(os_ann, ANN)
-			# optT    = explainer.calibrate_for_highest_auroc(benchmark_idod, ds_loader)			
-
-			# # for label in range(len(annotations.classes)):
-			# # 	label_name = annotations.classes[label]
-
-			# # 	SFM_summary = explainer.plot_softmax_by_feature(cPRD, ANN, 
-			# # 		label, eps, T,
-			# # 		explain_root/('%s_1_softmax_%s.png' % (net_name, label_name)))
-
-			# # 	SHAP_summary = explainer.plot_shap_by_feature(cPRD, ANN, 
-			# # 		label, eps, T,
-			# # 		explain_root/('%s_2_shap_%s.png' % (net_name, label_name)),
-			# # 		softmax_scale=1)
-
-			# # 	if label == 0:
-			# # 		set_title = True
-			# # 	else:
-			# # 		set_title = False
-				
-			# # 	explainer.summary_by_feature(SFM_summary, T, 0,
-			# # 		net_name, aLabSFM[label], label_name, set_title=set_title)
-
-			# # 	explainer.summary_by_feature(SHAP_summary, T, len(T)-1,
-			# # 		net_name, aLabSHAP[label], label_name, set_title=set_title)			
-			
-			# explainer.roc_explain(cPRD[0], benchmark_idod, T, explain_root/('%s_3_roc.png' % (net_name)),
-			# 	explain_root/('%s_4_auroc.png' % (net_name)))
-			# explainer.plot_inout_score_distributions(cPRD[0], benchmark_idod, T, 
-			# 	explain_root/('%s_5_score_inout.png' % (net_name)),
+			aurocs = explain.roc_net(cPRD[0], idod, T, explain_root/('%s_3_roc.png' % (net_name)),
+				explain_root/('%s_4_auroc.png' % (net_name)))
+			# explainer.plot_inout_score_distributions(cPRD[0], idod, T, 
+			# 	explain_root/('%s_3_score_inout.png' % (net_name)),
 			# 	figsize=(40,20))
 
-			net_ind += 1
+			axAUROC.plot(T, aurocs, label=('%s' % net_name))			
 
 	
-	figmSFM.savefig(explain_root/'0_baseline_certainty.png')
+	figBaseUNC.savefig(explain_root/'0_bas_uncertainty_summary.png')
+	figCalUNC.savefig(explain_root/'0_cal_uncertainty_summary.png')
 
-	axbROC.legend(fontsize=fontsize-4, loc='lower right')
-	axbROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
-	axbROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
-	figbROC.savefig(explain_root/'1_baseline_roc.png')
+	axBaseROC.legend(fontsize=fontsize-4, loc='lower right')
+	axBaseROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axBaseROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figBaseROC.savefig(explain_root/'1_bas_roc_summary.png')
 
-	axtROC.legend(fontsize=fontsize-4, loc='lower right')
-	axtROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
-	axtROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
-	figtROC.savefig(explain_root/'2_tscaling_roc.png')
+	axCalROC.legend(fontsize=fontsize-4, loc='lower right')
+	axCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figCalROC.savefig(explain_root/'1_cal_roc.png')
 	
 	axAUROC.legend(fontsize=fontsize-4, loc='lower right')
-	figAUROC.savefig(explain_root/'3_auroc.png')
+	figAUROC.savefig(explain_root/'2_auroc_summary.png')
 
-	# handles, labels = aLabSFM[0,0].get_legend_handles_labels()
-	# fLabSFM.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	# fLabSFM.savefig(explain_root/'1_softmax_by_feature.png')
+	handles, labels = axBaseSHAP[0,0].get_legend_handles_labels()
+	figBaseSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
+	figBaseSHAP.savefig(explain_root/'3_bas_shap_summary.png')
 
-	# handles, labels = aLabSHAP[0,0].get_legend_handles_labels()
-	# fLabSHAP.legend(handles, labels, fontsize=fontsize, loc='upper right')
-	# fLabSHAP.savefig(explain_root/'2_shap_by_feature.png')
+	handles, labels = axCalSHAP[0,0].get_legend_handles_labels()
+	figCalSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
+	figCalSHAP.savefig(explain_root/'3_cal_shap_summary.png')

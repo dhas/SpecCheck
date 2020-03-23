@@ -45,7 +45,7 @@ for net_ind, net_name in enumerate(nets): #nets:
 	HIT = baseline['HIT']
 	UNC = np.max(PRD[0,0], axis=1)
 	SHAP = explain.shap_by_feature(UNC, ANN, out_dir/('%s_shap_by_feature.png' % net_name))
-	explain.mean_shap_by_feature(SHAP, ANN, net_name, axBAS)
+	explain.shap_summary(SHAP, ANN, net_name, axBAS)
 
 	calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)
 	if not calibrated_npz.exists():

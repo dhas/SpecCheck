@@ -79,6 +79,79 @@ class BaselineExplainer:
 			return PRD, HIT
 
 
+def uncertainty_summary(UNC, idod, net_name, id_ax, od_ax, fontsize=20, figsize=(30,15)):
+	hist, bins = np.histogram(UNC[idod==annotations.id_label], bins=15)
+	freq = hist/np.sum(hist)
+	id_ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins),
+				color='blue')
+	id_ax.set_ylim([0,1])
+	id_ax.set_title(net_name, fontsize=fontsize)
+
+	hist, bins = np.histogram(UNC[idod==annotations.od_label], bins=15)
+	freq = hist/np.sum(hist)
+	od_ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins),
+		color='red')
+	od_ax.set_ylim([0,1])
+
+
+def _confusion_matrix(scores, id_ind, od_ind, threshold):
+		cmat = []
+		for t in threshold:
+			tpr = np.count_nonzero(scores[id_ind] > t)/len(id_ind)
+			fnr = np.count_nonzero(scores[id_ind] < t)/len(id_ind)
+			tnr = np.count_nonzero(scores[od_ind] < t)/len(od_ind)
+			fpr = np.count_nonzero(scores[od_ind] > t)/len(od_ind)
+			cmat.append([tpr, fnr, fpr, tnr])
+		return np.stack(cmat)
+
+
+def roc_summary(UNC, idod, axs, net_name, fontsize=20, figsize=(30,15)):
+		id_ind = np.where(idod == annotations.id_label)[0]
+		od_ind = np.where(idod == annotations.od_label)[0]
+		threshold = np.linspace(0.5,1, num=20)
+		cmat =  _confusion_matrix(UNC, id_ind, od_ind, threshold)
+		auroc = auc(cmat[:,2], cmat[:,0])
+		axs.plot(cmat[:,2], cmat[:,0],
+				label='%s, AUROC-%0.3f' % (net_name,auroc))
+
+def roc_net(PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30,15)):
+		id_ind = np.where(idod == annotations.id_label)[0]
+		od_ind = np.where(idod == annotations.od_label)[0]
+		fig, axs = plt.subplots(figsize=figsize)
+		mSFM  = np.max(PRD,axis=2)		
+		threshold = np.linspace(0.5,1, num=20)
+		
+		aurocs  = []
+		mses_id = []
+		mses_od = []
+
+		for i,t in enumerate(T):
+			cmat =  _confusion_matrix(mSFM[i], id_ind, od_ind, threshold)
+			auroc = auc(cmat[:,2], cmat[:,0])
+			axs.plot(cmat[:,2], cmat[:,0],
+				label='T-%0.3f, AUROC-%0.3f' % (T[i],auroc))
+			aurocs.append(auroc)
+			mses_id.append(np.square(1.0 - mSFM[i,id_ind]).mean())
+			mses_od.append(np.square(mSFM[i,od_ind] - 0.5).mean())
+
+		axs.legend(fontsize=fontsize-4, loc='lower right')
+		fig.savefig(roc_savename)
+
+		fig,a0 = plt.subplots(figsize=figsize)
+		a0.plot(T, aurocs, label='auroc', color='blue')
+		a1 = a0.twinx()
+		a1.plot(T,mses_id, label='mse_id', color='orange')
+		a1.plot(T,mses_od, label='mse_od', color='green')
+
+		h1, l1 = a0.get_legend_handles_labels()
+		h2, l2 = a1.get_legend_handles_labels()
+		handles = h1 + h2
+		labels 	= l1 + l2		
+		# fig.legend(handles, labels, bbox_to_anchor=[0.9, 0.97], loc='upper right')
+		a0.legend(handles, labels,prop={'size': fontsize-4})		
+		fig.savefig(auroc_savename)
+		return aurocs
+
 def shap_by_feature(UNC, ANN, savename, fontsize=20, figsize=(30,15)):
 	SHAPS = []
 	fig, axs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)	
@@ -99,7 +172,7 @@ def shap_by_feature(UNC, ANN, savename, fontsize=20, figsize=(30,15)):
 	return np.stack(SHAPS)
 
 
-def mean_shap_by_feature(SHAP, ANN, net_name, axs, fontsize=20):	
+def shap_summary(SHAP, ANN, net_name, axs, fontsize=20):	
 	for cname in annotations.classes:
 		clabel 	= annotations.class_to_label_dict[cname]
 		cind   	= np.where(ANN[:,0] == clabel)[0]
@@ -117,6 +190,7 @@ def mean_shap_by_feature(SHAP, ANN, net_name, axs, fontsize=20):
 				axs[clabel, f].set_ylabel(cname, fontsize=fontsize)
 	
 				
+
 
 
 
