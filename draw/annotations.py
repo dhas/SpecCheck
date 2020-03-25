@@ -202,8 +202,7 @@ def annotations_to_sample(ann, side):
 
 	def _circle_opencv(xm,ym,r,br,t,side):
 		canvas = np.zeros(shape=(side,side))	
-		img = cv2.circle(canvas,(xm,ym),r,int(br),t)
-		print(xm,ym,r)
+		img = cv2.circle(canvas,(xm,ym),r,int(br),t)		
 		xmin, ymin = xm - r, ym - r
 		xmax, ymax = xm + r, ym + r
 		ann = [class_to_label_dict['circle'], 

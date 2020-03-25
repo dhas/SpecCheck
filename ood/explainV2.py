@@ -85,6 +85,7 @@ def uncertainty_summary(UNC, idod, net_name, id_ax, od_ax, fontsize=20, figsize=
 	id_ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins),
 				color='blue')
 	id_ax.set_ylim([0,1])
+	id_ax.set_xlim([0.5,1])
 	id_ax.set_title(net_name, fontsize=fontsize)
 
 	hist, bins = np.histogram(UNC[idod==annotations.od_label], bins=15)
@@ -92,8 +93,13 @@ def uncertainty_summary(UNC, idod, net_name, id_ax, od_ax, fontsize=20, figsize=
 	od_ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins),
 		color='red')
 	od_ax.set_ylim([0,1])
+	od_ax.set_xlim([0.5,1])
 
 
+COL_TPR = 0
+COL_FNR = 1
+COL_FPR = 2
+COL_TNR = 3
 def _confusion_matrix(scores, id_ind, od_ind, threshold):
 		cmat = []
 		for t in threshold:
