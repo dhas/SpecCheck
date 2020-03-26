@@ -148,11 +148,14 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 	num_classes  = len(annotations.classes)
 	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
 	figBaseUNC, axBaseUNC = plt.subplots(2, len(nets), figsize=(30,10))
-	figCalUNC, axCalUNC = plt.subplots(2, len(nets), figsize=(30,10))
+	figXCalUNC, axXCalUNC = plt.subplots(2, len(nets), figsize=(30,10))
+	figMCalUNC, axMCalUNC = plt.subplots(2, len(nets), figsize=(30,10))
 	figBaseROC, axBaseROC = plt.subplots(figsize=(30,10))
-	figCalROC, axCalROC = plt.subplots(figsize=(30,10))
+	figXCalROC, axXCalROC = plt.subplots(figsize=(30,10))
+	figMCalROC, axMCalROC = plt.subplots(figsize=(30,10))
 	figBaseSHAP, axBaseSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
-	figCalSHAP, axCalSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
+	figXCalSHAP, axXCalSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
+	figMCalSHAP, axMCalSHAP = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=(30,10))
 
 	
 	for net_ind, net_name in enumerate(nets):
@@ -203,13 +206,15 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 			calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)			
 			if calibrated_npz.exists():
 				state = np.load(calibrated_npz)
-				optT  = state['optT']
+				xcalT  = state['xcalT']
+				mcalT  = state['mcalT']
 				T     = state['T']
 				cPRD  = state['cPRD']
 				cHIT  = state['cHIT']
 			else:				
-				optT    = model.calibrate_for_highest_auroc(idod, ds_loader)
-				T = np.hstack([np.linspace(1, 10, num=10), [optT]])
+				xcalT    = model.calibrate_for_highest_auroc(idod, ds_loader)
+				mcalT    = model.calibrate_for_centered_distribution(idod, ds_loader)
+				T = np.hstack([np.linspace(1, 10, num=10), [xcalT, mcalT]])
 				T = np.hstack([1/T[1:], T])
 				T.sort()
 				cPRD, cHIT, _ = model.evaluate(CUDA_DEVICE,
@@ -217,16 +222,23 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 					eps, T,
 					var=ds_settings['variance'],
 					y_ann=ds_ann_npy)
-				np.savez(calibrated_npz, optT=optT, T=T, cPRD=cPRD, cHIT=cHIT)
+				np.savez(calibrated_npz, xcalT=xcalT, mcalT=mcalT, T=T, cPRD=cPRD, cHIT=cHIT)
 
 						
-			calUNC    = np.max(cPRD[0,T == optT][0], axis=1)
-			explain.uncertainty_summary(calUNC, idod, 
-				net_name, axCalUNC[0, net_ind], axCalUNC[1, net_ind])
-			explain.roc_summary(calUNC, idod, axCalROC, net_name)
+			xcalUNC = np.max(cPRD[0,T == xcalT][0], axis=1)
+			explain.uncertainty_summary(xcalUNC, idod, 
+				net_name, axXCalUNC[0, net_ind], axXCalUNC[1, net_ind])
+			explain.roc_summary(xcalUNC, idod, axXCalROC, net_name)
 			
-			SHAP = explain.shap_by_feature(calUNC, ANN, explain_root/('%s_2_cal_shap.png' % net_name))
-			explain.shap_summary(SHAP, ANN, net_name, axCalSHAP)
+			SHAP = explain.shap_by_feature(xcalUNC, ANN, explain_root/('%s_2_xcal_shap.png' % net_name))
+			explain.shap_summary(SHAP, ANN, net_name, axXCalSHAP)
+
+			mcalUNC = np.max(cPRD[0,T == mcalT][0], axis=1)
+			explain.uncertainty_summary(mcalUNC, idod, 
+				net_name, axMCalUNC[0, net_ind], axMCalUNC[1, net_ind])
+			explain.roc_summary(mcalUNC, idod, axMCalROC, net_name)
+			SHAP = explain.shap_by_feature(mcalUNC, ANN, explain_root/('%s_2_mcal_shap.png' % net_name))
+			explain.shap_summary(SHAP, ANN, net_name, axMCalSHAP)
 
 			aurocs = explain.roc_net(cPRD[0], idod, T, explain_root/('%s_3_roc.png' % (net_name)),
 				explain_root/('%s_4_auroc.png' % (net_name)))
@@ -238,17 +250,23 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 
 	
 	figBaseUNC.savefig(explain_root/'0_bas_uncertainty_summary.png')
-	figCalUNC.savefig(explain_root/'0_cal_uncertainty_summary.png')
+	figXCalUNC.savefig(explain_root/'0_xcal_uncertainty_summary.png')
+	figMCalUNC.savefig(explain_root/'0_mcal_uncertainty_summary.png')
 
 	axBaseROC.legend(fontsize=fontsize-4, loc='lower right')
 	axBaseROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
 	axBaseROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
 	figBaseROC.savefig(explain_root/'1_bas_roc_summary.png')
 
-	axCalROC.legend(fontsize=fontsize-4, loc='lower right')
-	axCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
-	axCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
-	figCalROC.savefig(explain_root/'1_cal_roc.png')
+	axXCalROC.legend(fontsize=fontsize-4, loc='lower right')
+	axXCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axXCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figXCalROC.savefig(explain_root/'1_xcal_roc.png')
+
+	axMCalROC.legend(fontsize=fontsize-4, loc='lower right')
+	axMCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
+	axMCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	figMCalROC.savefig(explain_root/'1_mcal_roc.png')
 	
 	axAUROC.legend(fontsize=fontsize-4, loc='lower right')
 	figAUROC.savefig(explain_root/'2_auroc_summary.png')
@@ -257,6 +275,10 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, test_root, explain_root,
 	figBaseSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
 	figBaseSHAP.savefig(explain_root/'3_bas_shap_summary.png')
 
-	handles, labels = axCalSHAP[0,0].get_legend_handles_labels()
-	figCalSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
-	figCalSHAP.savefig(explain_root/'3_cal_shap_summary.png')
+	handles, labels = axXCalSHAP[0,0].get_legend_handles_labels()
+	figXCalSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
+	figXCalSHAP.savefig(explain_root/'3_xcal_shap_summary.png')
+
+	handles, labels = axMCalSHAP[0,0].get_legend_handles_labels()
+	figMCalSHAP.legend(handles, labels, loc='upper right', fontsize=fontsize)
+	figMCalSHAP.savefig(explain_root/'3_mcal_shap_summary.png')

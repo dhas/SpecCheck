@@ -216,7 +216,18 @@ class TrainedModel:
 		cal_encoder.set_temperature(idod_loader)
 		return cal_encoder.temperature.item()
 
-	
+	def calibrate_for_centered_distribution(self, idod, ds_loader, batch_size=100):
+		idod_e = np.full(len(idod), 0.75)
+		idod_ds = load.my_subset(ds_loader.dataset, 
+			np.arange(0,len(ds_loader.dataset)),
+			torch.tensor(idod_e).type(torch.float))
+		idod_loader = torch.utils.data.DataLoader(idod_ds, 
+			batch_size=batch_size, shuffle=False)
+
+		cal_encoder = ModelWithTemperature(self.model)
+		cal_encoder.set_mid_cal(idod_loader)
+		return cal_encoder.temperature.item()
+
 	# def plot_inout_score_distributions(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
 	# 	id_ind = np.where(idod == annotations.id_label)[0]
 	# 	od_ind = np.where(idod == annotations.od_label)[0]

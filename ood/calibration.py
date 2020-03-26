@@ -83,9 +83,54 @@ class ModelWithTemperature(nn.Module):
 
 		optim_steps = np.array(optim_steps)
 		optim_min   = optim_steps[np.argmin(optim_steps[:,0])]
-		self.temperature = nn.Parameter(torch.ones(1) * optim_min[3])		
+		self.temperature = nn.Parameter(torch.ones(1) * optim_min[3])
 		print('After calibration - POS_MSE: %.3f, NEG_MSE: %.3f, T: %0.3f' % (optim_min[1], optim_min[2], optim_min[3]))
 		return self
+
+
+	def _scaled_label_scores(self, logits, labels):
+			max_pred = self.scaled_score(logits)			
+			return max_pred
+
+	def set_mid_cal(self, valid_loader):
+		self.cuda()
+		mse_criterion = nn.MSELoss().cuda()		
+
+		logits_list = []
+		labels_list = []
+		with torch.no_grad():
+			for input, label in valid_loader:
+				input = input.cuda()
+				logits = self.model(input)
+				logits_list.append(logits)
+				labels_list.append(label)
+			logits = torch.cat(logits_list).cuda()
+			labels = torch.cat(labels_list).cuda()
+		
+		scores = self._scaled_label_scores(logits, labels)
+		mse    = mse_criterion(scores, labels)
+		print('Before calibration - MSE: %.3f, T: %0.3f' % \
+			(mse.item(), self.temperature.item()))
+		optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=2000)
+
+		optim_steps = []		
+		def eval():			
+			scores = self._scaled_label_scores(logits, labels)
+			mse    = mse_criterion(scores, labels)
+			loss   = mse
+			loss.backward()
+			# print(loss.item(), self.temperature.item())
+			optim_steps.append([loss.item(), self.temperature.item()])
+			return loss
+		
+		optimizer.step(eval)
+		optim_steps = np.array(optim_steps)
+		optim_min   = optim_steps[np.argmin(optim_steps[:,0])]
+		self.temperature = nn.Parameter(torch.ones(1) * optim_min[1])
+		print('After calibration - MSE: %.3f, T: %0.3f' % (optim_min[0], self.temperature))
+		return self
+		
+	
 
 
 class _ECELoss(nn.Module):
