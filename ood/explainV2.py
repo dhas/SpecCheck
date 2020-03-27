@@ -158,9 +158,11 @@ def roc_net(PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30
 		fig.savefig(auroc_savename)
 		return aurocs
 
-def shap_by_feature(UNC, ANN, savename, fontsize=20, figsize=(30,15)):
+def shap_by_feature(UNC, ANN, idod, savename, fontsize=20, figsize=(30,15)):
 	SHAPS = []
-	fig, axs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)	
+	ANNS  = []
+	IDODS = []
+	fig, axs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
 	for cname in annotations.classes:
 		clabel 		= annotations.class_to_label_dict[cname]
 		cind   		= np.where(ANN[:,0] == clabel)[0]
@@ -173,9 +175,52 @@ def shap_by_feature(UNC, ANN, savename, fontsize=20, figsize=(30,15)):
 		for f, feat in enumerate(annotations.FEATS):
 			axs[clabel, f].scatter(X[feat], SHAP[:,f])
 			axs[clabel, f].set_title(feat, fontsize=fontsize)
+		ANNS.append(ANN[cind, 1:])
 		SHAPS.append(SHAP)
+		IDODS.append(idod[cind])
 	fig.savefig(savename)
-	return np.stack(SHAPS)
+	return np.stack(ANNS), np.stack(SHAPS), np.stack(IDODS)
+
+def estimated_id_features_using_shap(SHAPS, ANNS, dim, draw_lims, id_savename, od_savename, fontsize=20, figsize=(30,15)):
+	idfig, idaxs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
+	odfig, odaxs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
+	for cname in annotations.classes:
+		clabel 	= annotations.class_to_label_dict[cname]
+		shap    = SHAPS[clabel]
+		ann     = ANNS[clabel]
+		for f, feat in enumerate(annotations.FEATS):
+			F  = ann[:, f]
+			S  = shap[:, f]
+			idF  = F[S >= 0]
+			hist, bins = np.histogram(idF, bins=15)
+			freq = hist/len(idF)
+			idaxs[clabel, f].bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			idaxs[clabel, f].set_ylim([0,1])
+			print('ID sum - %0.2f' % np.sum(freq))
+			# idaxs[clabel, f].hist(idF)
+			if feat == 'BR':
+				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
+				idaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//12])
+			else: #coordinates
+				f_spread = np.arange(0, dim + 1)
+				idaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//8])
+
+			odF  = F[S < 0]
+			hist, bins = np.histogram(odF, bins=15)
+			freq = hist/len(odF)
+			odaxs[clabel, f].bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			odaxs[clabel, f].set_ylim([0,1])
+			print('OD sum - %0.2f' % np.sum(freq))
+			# odaxs[clabel, f].hist(odF)
+			if feat == 'BR':
+				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
+				odaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//12])
+			else: #coordinates
+				f_spread = np.arange(0, dim + 1)
+				odaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//8])
+
+	idfig.savefig(id_savename)
+	odfig.savefig(od_savename)
 
 
 def shap_summary(SHAP, ANN, net_name, axs, fontsize=20):	
@@ -185,7 +230,7 @@ def shap_summary(SHAP, ANN, net_name, axs, fontsize=20):
 		cANN    = ANN[cind, 1:]
 		shap 	= SHAP[clabel]
 		for f, feat in enumerate(annotations.FEATS):
-			F  = cANN[:, f]				
+			F  = cANN[:, f]
 			S  = shap[:,f]				
 			uF = np.unique(F)	
 			mS = [S[F == f].mean() for f in uF]				

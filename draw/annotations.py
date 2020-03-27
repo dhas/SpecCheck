@@ -287,3 +287,9 @@ def annotations_from_sample(x, shape, min_sz):
 	# 	return [cl, 0, 0, 0, 0]
 	# else:
 	# 	return [cl, x0, y0, sz, br]
+
+
+# def pseudo_label_annotations(ANN, SHAP):
+# 	PIDODS = []
+	
+		
