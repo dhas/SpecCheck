@@ -99,4 +99,4 @@ for net_ind, net_name in enumerate(['VGG11']): #nets:
 	# 	batch_size=batch_size, shuffle=False)
 
 	# cal_encoder = ModelWithTemperature(model.model)
-	# cal_encoder.set_mid_cal(idod_loader)
+	# cal_encoder.set_mid_cal_odin(idod_loader, ds_settings['variance'])

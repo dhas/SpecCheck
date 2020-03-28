@@ -1,6 +1,7 @@
 import torch
 from torch import nn, optim
 from torch.nn import functional as F
+from torch.autograd import Variable
 import numpy as np
 
 
@@ -15,7 +16,8 @@ class ModelWithTemperature(nn.Module):
 	def __init__(self, model):
 		super(ModelWithTemperature, self).__init__()
 		self.model = model
-		self.temperature = nn.Parameter(torch.ones(1) * 1.0)		
+		self.temperature = nn.Parameter(torch.ones(1) * 1.0)
+		# self.epsilon = nn.Parameter(torch.ones(1)*0.1)
 
 	def forward(self, input):
 		logits = self.model(input)
@@ -92,6 +94,7 @@ class ModelWithTemperature(nn.Module):
 			max_pred = self.scaled_score(logits)			
 			return max_pred
 
+
 	def set_mid_cal(self, valid_loader):
 		self.cuda()
 		mse_criterion = nn.MSELoss().cuda()		
@@ -129,8 +132,47 @@ class ModelWithTemperature(nn.Module):
 		self.temperature = nn.Parameter(torch.ones(1) * optim_min[1])
 		print('After calibration - MSE: %.3f, T: %0.3f' % (optim_min[0], self.temperature))
 		return self
-		
 	
+	
+	# def set_mid_cal_odin(self, valid_loader, var):
+	# 	self.cuda()
+	# 	mse_criterion = nn.MSELoss().cuda()
+	# 	ce_criterion  = nn.CrossEntropyLoss().cuda()
+
+	# 	inputs_list = []
+	# 	logits_list = []
+	# 	grads_list  = []
+
+	# 	for _x, _y in valid_loader:
+	# 		inputs = Variable(_x.cuda(), requires_grad = True)			
+	# 		outputs = self.model(inputs)
+	# 		# Calculating the confidence of the output, no perturbation added here, no temperature scaling used
+	# 		nnOutputs = outputs.data.cpu()
+	# 		nnOutputs = nnOutputs.numpy()
+	# 		nnOutputs = nnOutputs - np.max(nnOutputs,axis=1).reshape(-1,1)								
+	# 		nnOutputs = np.array([np.exp(nnOutput)/np.sum(np.exp(nnOutput)) for nnOutput in nnOutputs])				
+			
+	# 		# Calculating the perturbation we need to add, that is,
+	# 		# the sign of gradient of cross entropy loss w.r.t. input
+	# 		maxIndexTemp = np.argmax(nnOutputs, axis=1)
+	# 		labels = Variable(torch.LongTensor(maxIndexTemp).cuda())
+	# 		loss = ce_criterion(outputs, labels)
+	# 		loss.backward()
+
+	# 		# Normalizing the gradient to binary in {0, 1}
+	# 		gradient =  torch.ge(inputs.grad.data, 0)		
+	# 		gradient = (gradient.float() - 0.5) * 2				
+	# 		# Normalizing the gradient to the same space of image
+	# 		gradient[0][0] = (gradient[0][0] )/(var)
+	# 		inputs_list.append(inputs)
+	# 		grads_list.append(gradient)
+	# 	inputs = torch.cat(inputs_list).cuda()
+	# 	grads = torch.cat(grads_list).cuda()
+		
+	# 	pert_inputs = torch.add(inputs, -self.epsilon*grads)
+	# 	logits = self.model(pert_inputs)
+	# 	scores = self.scaled_scores(logits)
+	# 	print(scores.shape)
 
 
 class _ECELoss(nn.Module):

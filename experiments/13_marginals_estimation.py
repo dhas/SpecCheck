@@ -1,9 +1,9 @@
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
-import xgboost
-import shap
+# import pandas as pd
+# import xgboost
+# import shap
 # import sys
 # sys.path.append('..')
 # from draw import load, annotations
@@ -158,7 +158,15 @@ for net_ind, net_name in enumerate(['VGG11']):
 	_, _, idod = label_annotation_distribution(os_ann, ANN)
 	UNC = np.max(PRD[0,0], axis=1)
 
-	ANNS, SHAP, IDODS = shap_by_feature(UNC, ANN, idod, out_dir/('%s_1_bas_shap.png' % net_name))	
+	baseline_shap_npz = out_dir/('%s_baseline_shap.npz' % net_name)
+	if baseline_shap_npz.exists():
+		baseline_shap = np.load(baseline_shap_npz)
+		ANNS = baseline_shap['ANNS']
+		SHAP = baseline_shap['SHAP']
+		IDODS = baseline_shap['IDODS']
+	# else:
+		# ANNS, SHAP, IDODS = shap_by_feature(UNC, ANN, idod, out_dir/('%s_1_bas_shap.png' % net_name))			
+		# np.savez(baseline_shap_npz, ANNS=ANNS, SHAP=SHAP, IDODS=IDODS)
 	PIDODS = np.full((IDODS.shape), od_label)
 	PIDODS[np.all(SHAP > 0, axis=2)] = id_label
 	hit   = np.count_nonzero(PIDODS == IDODS)/IDODS.size
@@ -176,7 +184,15 @@ for net_ind, net_name in enumerate(['VGG11']):
 	cHIT  = state['cHIT']
 
 	xcalUNC = np.max(cPRD[0,T == xcalT][0], axis=1)
-	ANNS, SHAP, IDODS = shap_by_feature(xcalUNC, ANN, idod, out_dir/('%s_2_xcal_shap.png' % net_name))
+	xcal_shap_npz = out_dir/('%s_xcal_shap.npz' % net_name)
+	if xcal_shap_npz.exists():
+		xcal_shap = np.load(xcal_shap_npz)
+		ANNS = xcal_shap['ANNS']
+		SHAP = xcal_shap['SHAP']
+		IDODS = xcal_shap['IDODS']
+	# else:
+		# ANNS, SHAP, IDODS = shap_by_feature(xcalUNC, ANN, idod, out_dir/('%s_2_xcal_shap.png' % net_name))		
+		# np.savez(xcal_shap_npz, ANNS=ANNS, SHAP=SHAP, IDODS=IDODS)
 	PIDODS = np.full((IDODS.shape), od_label)
 	PIDODS[np.all(SHAP >= 0, axis=2)] = id_label
 	hit   = np.count_nonzero(PIDODS == IDODS)/IDODS.size
@@ -186,7 +202,15 @@ for net_ind, net_name in enumerate(['VGG11']):
 		out_dir/('%s_2_xcal_od.png' % net_name))
 
 	mcalUNC = np.max(cPRD[0,T == mcalT][0], axis=1)
-	ANNS, SHAP, IDODS = shap_by_feature(mcalUNC, ANN, idod, out_dir/('%s_3_mcal_shap.png' % net_name))
+	mcal_shap_npz = out_dir/('%s_mcal_shap.npz' % net_name)
+	if mcal_shap_npz.exists():
+		mcal_shap = np.load(mcal_shap_npz)
+		ANNS = mcal_shap['ANNS']
+		SHAP = mcal_shap['SHAP']
+		IDODS = mcal_shap['IDODS']
+	# else:	
+		# ANNS, SHAP, IDODS = shap_by_feature(mcalUNC, ANN, idod, out_dir/('%s_3_mcal_shap.png' % net_name))
+		# np.savez(mcal_shap_npz, ANNS=ANNS, SHAP=SHAP, IDODS=IDODS)
 	PIDODS = np.full((IDODS.shape), od_label)
 	PIDODS[np.all(SHAP >= 0, axis=2)] = id_label
 	hit   = np.count_nonzero(PIDODS == IDODS)/IDODS.size
