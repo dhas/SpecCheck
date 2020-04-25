@@ -87,9 +87,9 @@ for net_ind, net_name in enumerate(['VGG11']): #nets:
 				test_cfg['num_classes'])
 	checkpoint_path = encoders_root/net_name/('%s.tar' % net_name)
 	model = TrainedModel(encoder, checkpoint_path)
-	mcalT = model.calibrate_for_centered_distribution(idod, ds_loader)
+	# mcalT = model.calibrate_for_centered_distribution(idod, ds_loader)
 
-	xcalT = model.calibrate_for_highest_auroc(idod, ds_loader)
+	# xcalT = model.calibrate_for_highest_auroc(idod, ds_loader)
 	
 	# idod_e = np.full(len(idod), 0.75)
 	# idod_ds = load.my_subset(ds_loader.dataset, 
@@ -98,5 +98,13 @@ for net_ind, net_name in enumerate(['VGG11']): #nets:
 	# idod_loader = torch.utils.data.DataLoader(idod_ds, 
 	# 	batch_size=batch_size, shuffle=False)
 
-	# cal_encoder = ModelWithTemperature(model.model)
+	cal_encoder = ModelWithTemperature(model.model)	
+	T, s = cal_encoder.set_spread_cal(ds_loader)
+	print(T)
+	# fig, ax1 = plt.subplots(figsize=figsize)
+	# ax1.plot(s[:,1], -s[:,0], color='orange', label='variance')
+	# ax2 = ax1.twinx()
+	# ax2.plot(s[:,1], s[:,2], color='blue', label='mean')
+	# fig.savefig(out_dir/'1_mean_var.png')
+
 	# cal_encoder.set_mid_cal_odin(idod_loader, ds_settings['variance'])

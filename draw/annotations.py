@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt 
 import cv2
+from scipy.stats import wasserstein_distance
+from scipy.spatial.distance import jensenshannon
 
 classes    = ['circle', 'square']
 num_classes = len(classes)
@@ -24,15 +26,16 @@ ANN_COL_TH  	= 5
 GRAY_MAX		= 255
 
 ANNS   = ['CL', 'XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
-FEATS  = ['XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
+# FEATS  = ['XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
+FEATS  = [r'$Y^2$', r'$Y^3$', r'$Y^4$', r'$Y^5$', r'$Y^6$']
 	
 
-def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
+def plot_samples(imgs,savename, labels=None, size=(16,8), fontsize=16):
 	r = imgs.shape[0]
 	c = imgs.shape[1]	
 	show_xy = False
 
-	fig, axs = plt.subplots(r, c,figsize=size)
+	fig, axs = plt.subplots(r, c, figsize=size, gridspec_kw = {'hspace': 0.2})
 	for i in range(r):
 		for j in range(c):
 			img = imgs[i,j]
@@ -43,14 +46,15 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 			else:	    
 				ax 	= axs[i+j]
 			ax.imshow(img,cmap='Greys_r')
-			if not (labels is None):
+			if not (labels is None):				
 				annotated = labels.shape[2] == 1
 				if annotated:
-					ax.set_title('%s' % (labels[i][j][0]))
+					ax.set_title('%s' % (labels[i][j][0]), fontsize=fontsize)
+					fig_title = '%s' % (class_to_label_dict)
 				else:
 					show_xy = True
 					ax.set_title('%s' % (','.join(['%d' % l for l in labels[i][j]])),
-						fontdict={'fontsize': fontsize//2})
+						fontsize=fontsize)
 					bbox = labels[i][j]
 					x_min,y_min = bbox[1], bbox[2]
 					x_max,y_max = bbox[3], bbox[4]
@@ -58,16 +62,176 @@ def plot_samples(imgs,savename, labels=None, size=(20,10), fontsize=25):
 					ax.plot([x_min,x_max],[y_min,y_min],color='red')
 					ax.plot([x_max,x_max],[y_min,y_max],color='red')
 					ax.plot([x_min,x_max],[y_max,y_max],color='red')
+					fig_title = '%s, ANN-%s' % (class_to_label_dict, ANNS)
 			ax.axis('off')
-	if show_xy:
-		fig.text(0.06, 0.5, 'x', va='center', rotation='vertical', fontsize=fontsize)
-		fig.text(0.5, 0.05, 'y', ha='center',fontsize=fontsize)
+	# if show_xy:
+	# 	fig.text(0.06, 0.5, 'x', va='center', rotation='vertical', fontsize=fontsize)
+	# 	fig.text(0.5, 0.05, 'y', ha='center',fontsize=fontsize)
 	
-	fig.suptitle('%s, ANN-%s' % (class_to_label_dict, ANNS))
-	fig.savefig(savename)
+	# fig.suptitle(fig_title, fontsize=fontsize-5)	
+	fig.savefig(savename, bbox_inches='tight')
 	plt.close()
 
-def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, figsize=(30,10)):
+def histogram(f):
+	hist, bins = np.histogram(f, bins=15)
+	freq = hist/np.sum(hist)
+	return freq, bins
+
+def distance_function(true_distribution, estimated_distribution):
+	
+	QD_points = true_distribution
+	SD_points = estimated_distribution
+	
+	QD_min = np.min(QD_points)
+	QD_max = np.max(QD_points)
+	SD_min = np.min(SD_points)
+	SD_max = np.max(SD_points)
+	
+	if SD_max < QD_max and SD_min > QD_min:
+		dist = SD_max - SD_min
+		distance_measure = dist / (QD_max - QD_min)		
+	else:
+		dist_1 = np.abs(QD_min - SD_min)
+		dist_2 = np.abs(SD_max - SD_min)
+		dist_3 = np.abs(QD_max - SD_max)
+		tot_dist = dist_1 + dist_2 + dist_3
+		distance_measure = tot_dist / (QD_max - QD_min)		
+	return distance_measure
+	
+
+# def distance_function(true_distribution, estimated_distribution):    
+#     QD_points = true_distribution
+#     SD_points = estimated_distribution
+	
+#     dist_1 = np.abs(np.min(QD_points) - np.min(SD_points))
+#     dist_2 = np.abs(np.max(SD_points) - np.min(SD_points))
+#     dist_3 = np.abs(np.max(QD_points) - np.max(SD_points))
+#     tot_dist = dist_1 + dist_2 + dist_3
+#     distance_measure = tot_dist / (np.max(QD_points) - np.min(QD_points))
+#     return distance_measure
+
+def jaccard_index(x, y):
+	i = np.intersect1d(x, y)
+	u = np.union1d(x, y)
+
+	index = i.ptp()/u.ptp()
+	return index
+
+def set_intersect(x, y):
+	i = np.array([e for e in y if (e >= x.min() and e <= x.max())])
+	return i
+
+
+def set_union(x, y):
+	return np.union1d(x,y)
+
+
+# def overlap_index(x, y):
+# 	if (y.max() <= x.max()) and (y.min() >= x.min()): # y\in x
+# 		index = set_intersect(x, y).ptp()/x.ptp()		
+# 	else:
+# 		index = set_union(x, y).ptp()/x.ptp()
+
+# 	return index
+
+
+
+def obtain_support(points):	
+	return (points.min(), points.max())
+
+def no_overlap(SD_supp, QD_supp):
+	return (SD_supp[1] < QD_supp[0]) or (SD_supp[0] > QD_supp[1])
+
+def left_partial_overlap(SD_supp, QD_supp):
+	return (SD_supp[0] < QD_supp[0]) and (SD_supp[1] >= QD_supp[0]) and (SD_supp[1] <= QD_supp[1])
+
+def right_partial_overlap(SD_supp, QD_supp):
+	return (SD_supp[0] >= QD_supp[0]) and (SD_supp[0] <= QD_supp[1]) and (SD_supp[1] > QD_supp[1])
+
+def total_overlap(SD_supp, QD_supp):
+	return ((SD_supp[0] >= QD_supp[0]) and (SD_supp[1] <= QD_supp[1])) or ((QD_supp[0] >= SD_supp[0]) and (QD_supp[1] <= SD_supp[1]))
+
+def Jaccard_dist(QD_supp, SD_supp):
+	
+	sgn = 1 # underestimate
+	if no_overlap(SD_supp, QD_supp):
+		len_set_diff = (QD_supp[1] - QD_supp[0]) + (SD_supp[1] - SD_supp[0])
+		len_union = (QD_supp[1] - QD_supp[0]) + (SD_supp[1] - SD_supp[0])
+		
+	elif left_partial_overlap(SD_supp, QD_supp):
+		len_set_diff = (QD_supp[0] - SD_supp[0]) + (QD_supp[1] - SD_supp[1])
+		len_union = QD_supp[1] - SD_supp[0]
+	elif right_partial_overlap(SD_supp, QD_supp):
+		len_set_diff = (SD_supp[0] - QD_supp[0]) + (SD_supp[1] - QD_supp[1])
+		len_union = SD_supp[1] - QD_supp[0]
+	elif total_overlap(SD_supp, QD_supp):
+		if (QD_supp[1] >= SD_supp[1]) and (QD_supp[0] <= SD_supp[0]):
+			sgn = -1
+		len_set_diff = abs(QD_supp[0] - SD_supp[0]) + abs(QD_supp[1] - SD_supp[1])
+		len_union = max(QD_supp[1], SD_supp[1]) - min(QD_supp[0], SD_supp[0])
+	
+	J_dist = sgn*(len_set_diff / len_union)
+	return J_dist
+	
+def overlap_index(x, y):
+	supp_x = obtain_support(x)
+	supp_y = obtain_support(y)
+	return Jaccard_dist(supp_x, supp_y)
+	# return jaccard_index(x,y)
+
+
+
+
+def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savename, labelpad=5, fontsize=24, figsize=(12,6)):
+	ANN1 = ANN1[~np.all(ANN1[:,1:] == 0, axis=1)]
+	ANN2 = ANN2[~np.all(ANN2[:,1:] == 0, axis=1)]
+
+	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
+	wdist = np.zeros((len(class_to_label_dict), len(FEATS)))
+	odist = np.zeros((len(class_to_label_dict), len(FEATS)))
+	for cname in class_to_label_dict:
+		clabel = class_to_label_dict[cname]
+		cANN1 = ANN1[ANN1[:,0] == clabel,1:]
+		cANN2 = ANN2[ANN2[:,0] == clabel,1:]
+		for f, feat in enumerate(FEATS):
+			f2 = cANN2[:, f]
+			p2, bins = histogram(f2)
+			axs[clabel, f].bar(bins[:-1], p2, align="edge", width=np.diff(bins), alpha=0.5, label=labels[1])
+
+			f1 = cANN1[:, f]
+			p1, bins = histogram(f1)
+			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), alpha=0.5, label=labels[0])
+			axs[clabel, f].set_ylim([0,0.7])
+			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-10)
+			wdist[clabel, f] = wasserstein_distance(f1, f2)
+			odist[clabel, f] = overlap_index(f1, f2)#distance_function(f1, f2)
+			if '6' in FEATS[f]: # == 'BR':
+				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
+				axs[clabel, f].set_xticks(f_spread[::75])
+				# axs[clabel, f].text(120, 0.90, r'$W^%d(P_{T})-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
+				# axs[clabel, f].text(120, 0.75, r'$D^%d(P_{T})-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+			else: #coordinates
+				f_spread = np.arange(0, dim + 1)
+				axs[clabel, f].set_xticks(f_spread[::64])
+				# axs[clabel, f].text(20, 0.90, r'$W^%d(P_{T})-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
+				# axs[clabel, f].text(20, 0.75, r'$D^%d(P_{T})-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+
+			if f == 0:
+				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
+				axs[clabel, f].set_yticks([0.0, 0.3, 0.7])
+			else:
+				axs[clabel, f].set_yticks([])
+			if clabel == 0:
+				axs[clabel, f].set_title(FEATS[f], fontsize=fontsize-4)
+				axs[clabel, f].set_xticks([])
+	axs[clabel, f-1].legend(loc='upper left', fontsize=fontsize-4, frameon=False)
+	# handles, labels = axs[clabel, f].get_legend_handles_labels()
+	# fig.legend(handles, labels, loc='lower right', fontsize=fontsize)
+	fig.savefig(savename, bbox_inches='tight')
+	plt.close()
+	return wdist, odist
+
+def plot_annotation_distribution(ANN, draw_lims, dim, savename, wdist=None, fontsize=25, figsize=(30,10)):
 	ANN = ANN[~np.all(ANN[:,1:] == 0, axis=1)]
 	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
 	for cname in class_to_label_dict:
@@ -78,7 +242,10 @@ def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, fig
 			ax = axs[clabel,f_ind]
 			hist, bins = np.histogram(f, bins=15)
 			freq = hist/np.sum(hist)
-			ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			if wdist is None:
+				ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
+			else:
+				ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins), label='wdist-%0.2f' % wdist[clabel, f_ind])
 			ax.set_ylim([0,1])
 			# ax.hist(f, bins=30)
 			# if FEATS[f_ind] == 'SZ':
@@ -108,8 +275,16 @@ def plot_annotation_distribution(ANN, draw_lims, dim, savename, fontsize=20, fig
 				ax.set_ylabel(cname, fontsize=fontsize)
 			if clabel == 0:
 				ax.set_title(FEATS[f_ind], fontsize=fontsize)
-	fig.savefig(savename)
+			ax.legend(fontsize=fontsize-4, loc='upper right')
+	fig.savefig(savename, bbox_inches='tight')
 	plt.close()
+
+def annotations_list2dict(ann):
+	d = dict.fromkeys(classes)
+	for cname in classes:
+		clabel = class_to_label_dict[cname]
+		d[cname] = ann[ann[:,0] == clabel, 1:]
+	return d
 
 def label_annotation_distribution(os_ann, cs_ann):
 	os_ann = os_ann[os_ann[:,1] != 0]

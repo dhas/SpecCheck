@@ -97,7 +97,7 @@ class ModelWithTemperature(nn.Module):
 
 	def set_mid_cal(self, valid_loader):
 		self.cuda()
-		mse_criterion = nn.MSELoss().cuda()		
+		mse_criterion = nn.MSELoss().cuda()
 
 		logits_list = []
 		labels_list = []
@@ -132,8 +132,85 @@ class ModelWithTemperature(nn.Module):
 		self.temperature = nn.Parameter(torch.ones(1) * optim_min[1])
 		print('After calibration - MSE: %.3f, T: %0.3f' % (optim_min[0], self.temperature))
 		return self
+
+
+	def scaled_mean(self, logits, labels):
+		max_pred = self.scaled_score(logits)		
+		return max_pred, max_pred.mean()
+
+	def set_spread_cal(self, valid_loader, thr=None):
+		self.cuda()
+		var_mse_criterion = nn.MSELoss().cuda()
+		thr_mse_criterion = nn.MSELoss().cuda()
+
+		logits_list = []
+		labels_list = []
+		with torch.no_grad():
+			for input, label, _ in valid_loader:
+				input = input.cuda()
+				logits = self.model(input)
+				logits_list.append(logits)
+				labels_list.append(label)
+			logits = torch.cat(logits_list).cuda()
+			labels = torch.cat(labels_list).cuda()
+		scores 	  = self._scaled_label_scores(logits, labels)
+		score_mu  = scores.mean()
+		score_var = var_mse_criterion(scores, score_mu)		
+		print('Before calibration - MEAN: %0.3f, VAR: %.3f, T: %0.3f' % \
+				(score_mu.item(), score_var.item(), self.temperature.item()))
+
+		if not thr is None:
+			threshold = (torch.ones(scores.shape)*0.7).cuda()
+				# optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=2000)
+		optimizer = optim.Adam([self.temperature],lr = 1e-2)
+
+
+		optim_steps = []
+		def eval():			
+			scores  	 = self._scaled_label_scores(logits, labels)
+			score_mu     = scores.mean()
+			score_var    = var_mse_criterion(scores, score_mu)
+			if thr is None:
+				loss         = -score_var
+			else:
+				score_thr    = thr_mse_criterion(scores, threshold)
+				loss         = -score_var + score_thr
+			loss.backward()
+			# print(loss.item(), score_mu.item(), score_var.item(), self.temperature.item())
+			optim_steps.append([loss.item(), self.temperature.item(), score_mu.item(), score_var.item()])
+			return loss
+		
+		for i in range(1000):
+			optimizer.step(eval)
+		
+		optim_steps = np.array(optim_steps)
+		optim_min   = optim_steps[np.argmin(optim_steps[:,0])]		
+		self.temperature = nn.Parameter(torch.ones(1) * optim_min[1])
+		print('After calibration - MEAN: %0.3f, VAR: %.3f, T: %0.3f' % \
+				(optim_min[2], optim_min[3], self.temperature.item()))
+		
+		return self.temperature.item(), np.vstack(optim_steps) #self
 	
-	
+	def temp_softening(self, valid_loader):
+		with torch.no_grad():
+			for input, label, _ in valid_loader:
+				input = input.cuda()
+				logits = self.model(input)
+				logits_list.append(logits)
+				labels_list.append(label)
+			logits = torch.cat(logits_list).cuda()
+			labels = torch.cat(labels_list).cuda()
+		
+		stats = []
+		for t in range(1000):
+			scores 	  = logits/temperature
+			scores_mu = scores.mean()
+			scores_var = scores.var()
+			stats.append(scores_mu.item(), scores_var.item())
+		return stats
+
+
+
 	# def set_mid_cal_odin(self, valid_loader, var):
 	# 	self.cuda()
 	# 	mse_criterion = nn.MSELoss().cuda()
