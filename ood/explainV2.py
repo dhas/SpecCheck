@@ -60,11 +60,11 @@ def record_distances(prefix, wdist, odist, mode, fname):
 
 
 def distance_summary(wdist_mu, odist_mu, aurocs, net_names, axs, fontsize=24):	
-	width = 0.3 
+	width = 0.2 
 	ticks = np.arange(len(net_names))
-	axs.bar(ticks - width/2, wdist_mu, width, color='r', label='Wasserstein')
+	axs.bar(ticks - width/2, wdist_mu, width, color='r', label='Mean Wasserstein')
 	ax1 = axs.twinx()
-	ax1.bar(ticks + width/2, odist_mu, width, label='Overlap')
+	ax1.bar(ticks + width/2, odist_mu, width, label='Mean Overlap')
 	ax1.plot(ticks, aurocs, color='k', label='AUROC')
 
 	axs.set_xticks(ticks)
@@ -78,6 +78,8 @@ def distance_summary(wdist_mu, odist_mu, aurocs, net_names, axs, fontsize=24):
 	lines, labels = ax1.get_legend_handles_labels()
 	lines2, labels2 = axs.get_legend_handles_labels()
 	ax1.legend(lines + lines2, labels + labels2, fontsize=fontsize-4, loc='upper left', frameon=False, ncol=3)
+	axs.set_ylabel('Wasserstein distance', labelpad=5, fontsize=fontsize)
+	ax1.set_ylabel('Overlap index', labelpad=5, fontsize=fontsize)
 
 
 def assess_pseudo_labeling(tag, SHAP, IDODS):
@@ -104,7 +106,7 @@ def assess_pseudo_labeling(tag, SHAP, IDODS):
 
 
 
-def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, labelpad=5, fontsize=24, figsize=(12,6)):
+def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, labelpad=5, fontsize=24, figsize=(12,6), overlap_ax=None):
 	os_ann = os_ann[~np.all(os_ann[:,1:] == 0, axis=1)]
 	os_ann = annotations.annotations_list2dict(os_ann)
 
@@ -119,16 +121,27 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 		for f, feat in enumerate(annotations.FEATS):
 			F, S  = cann[:, f], shap[:, f]
 			f2 = F[S > 0]
-			p2, bins = histogram(f2)
-			axs[clabel, f].bar(bins[:-1], p2, align="edge", width=np.diff(bins), alpha=0.5, label=r'$\widehat{P}_{\mathcal{S}}$')
+			p2, bins2 = histogram(f2)
+			axs[clabel, f].bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), alpha=0.5, label=r'$\widehat{P}_{\mathcal{S}}$')
 
 			f1 = oann[:, f]
-			p1, bins = histogram(f1)
-			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), alpha=0.5, label=r'$\widetilde{P}_{\mathcal{S}}$')
+			p1, bins1 = histogram(f1)
+			axs[clabel, f].bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), alpha=0.5, label=r'$\widetilde{P}_{\mathcal{S}}$')
 			axs[clabel, f].set_ylim([0, 0.5])
 			wdist[clabel, f] = wasserstein_distance(f1, f2)
 			odist[clabel, f] = annotations.overlap_index(f1, f2) #annotations.distance_function(f1, f2)
 			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
+			
+			if f == 0 and clabel == 0 and (not overlap_ax is None):
+				overlap_ax.bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), alpha=0.5)				
+				overlap_ax.bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), alpha=0.5)				
+				overlap_ax.text(20, 0.45, r'$D^%d_W(\widehat{P}_{S})-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
+				overlap_ax.text(20, 0.35, r'$D^%d_V(\widehat{P}_{S})-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				overlap_ax.set_title(annotations.FEATS[f], fontsize=fontsize)
+				overlap_ax.set_ylim([0, 0.5])
+				overlap_ax.set_xlim([0, 60])
+				overlap_ax.tick_params(axis='both', which='major', labelsize=fontsize-12)
+
 			if '6' in feat: # == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
 				axs[clabel, f].set_xticks(f_spread[::75])
@@ -220,7 +233,7 @@ def uncertainty_summary(UNC, idod, net_name, id_ax, od_ax, labels, yticks=False,
 		od_ax.set_xlim([0.5,1])
 	
 	id_ax.set_xticks([])
-	od_ax.set_xticks([0.5, 0.7, 1.0])
+	od_ax.set_xticks([0.5, 0.7, 0.9])
 	
 	if not yticks:
 		id_ax.set_yticks([])

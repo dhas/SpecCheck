@@ -41,9 +41,9 @@ def run_test(tests_root, sources, test_config):
 	# # np.save(out_dir/'3_kl_by_feature.npy', fkl)
 	enc_cfg = test_cfg['encoders']
 	os_root = test_root/os_cfg['root']
-	# # prepare_encoders(enc_cfg, test_cfg['dim'], 
-	# # 	test_cfg['num_classes'], 
-	# # 	os_root, test_root)
+	# prepare_encoders(enc_cfg, test_cfg['dim'], 
+	# 	test_cfg['num_classes'], 
+	# 	os_root, test_root)
 
 	cs_root = test_root/cs_cfg['root']
 	explain_with_encoder_set(enc_cfg, cs_root,
