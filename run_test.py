@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 import argparse
 from draw.annotations import compare_annotation_distributions
-from prepare_test import overlap_metric_example, prepare_observed_set, prepare_coverage_set, prepare_encoders, explain_with_encoder_set
+from prepare_test import overlap_metric_example, prepare_observed_set, prepare_coverage_set, prepare_encoders, explain_with_encoder_set, explain_set_summary
 from ood.explainV2 import get_feature_KL, record_distances
 
 def load_config(config_path):
@@ -31,26 +31,30 @@ def run_test(tests_root, sources, test_config):
 
 	os_ann = np.load(test_root/os_cfg['root']/'labels.npy')
 	cs_ann = np.load(test_root/cs_cfg['root']/'labels.npy')
-	wdist, odist = compare_annotation_distributions(os_ann, cs_ann, [r'$\widetilde{P}_S$', r'$P_T$'],
+	wdist, odist = compare_annotation_distributions(os_ann, cs_ann, [r'$P_S$', r'$P_T$'],
 	cs_cfg['draw_limits'], test_cfg['dim'], out_dir/'2_os_cs_ann.pdf')
 	record_distances('P_T', wdist, odist, 'w', out_dir/'dist.txt')
-	
 
-
-	# # fkl = get_feature_KL(os_ann, cs_ann)
-	# # np.save(out_dir/'3_kl_by_feature.npy', fkl)
-	enc_cfg = test_cfg['encoders']
 	os_root = test_root/os_cfg['root']
-	# prepare_encoders(enc_cfg, test_cfg['dim'], 
-	# 	test_cfg['num_classes'], 
-	# 	os_root, test_root)
-
 	cs_root = test_root/cs_cfg['root']
-	explain_with_encoder_set(enc_cfg, cs_root,
-		np.load(os_root/'labels.npy'),
-		test_cfg['dim'],
-		cs_cfg['draw_limits'],
-		test_root, out_dir)
+	enc_cfg = test_cfg['encoders']
+	num_iters = 1 #test_cfg['num_iters']
+	for enc_set in ['set01']:#enc_cfg:
+		set_cfg = enc_cfg[enc_set]
+		for iteration in range(num_iters):
+			print('Processing %s' % enc_set)		
+			# prepare_encoders(set_cfg, test_cfg['dim'], 
+			# 	test_cfg['num_classes'], 
+			# 	os_root, test_root, iteration)
+			explain_with_encoder_set(set_cfg, cs_root,
+				np.load(os_root/'labels.npy'),
+				test_cfg['dim'],
+				cs_cfg['draw_limits'],
+				test_root, out_dir, iteration)
+			break
+		# explain_set_summary(set_cfg, test_root, 
+		# 	out_dir, num_iters)
+
 
 if __name__ == '__main__':
 	main_cfg = load_config('config/config.yml')

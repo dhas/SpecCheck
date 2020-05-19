@@ -50,19 +50,19 @@ def plot_samples(imgs,savename, labels=None, size=(16,8), fontsize=16):
 				annotated = labels.shape[2] == 1
 				if annotated:
 					ax.set_title('%s' % (labels[i][j][0]), fontsize=fontsize)
-					fig_title = '%s' % (class_to_label_dict)
+					# fig_title = '%s' % (class_to_label_dict)
 				else:
 					show_xy = True
 					ax.set_title('%s' % (','.join(['%d' % l for l in labels[i][j]])),
 						fontsize=fontsize)
-					bbox = labels[i][j]
-					x_min,y_min = bbox[1], bbox[2]
-					x_max,y_max = bbox[3], bbox[4]
-					ax.plot([x_min,x_min],[y_min,y_max],color='red')
-					ax.plot([x_min,x_max],[y_min,y_min],color='red')
-					ax.plot([x_max,x_max],[y_min,y_max],color='red')
-					ax.plot([x_min,x_max],[y_max,y_max],color='red')
-					fig_title = '%s, ANN-%s' % (class_to_label_dict, ANNS)
+					# bbox = labels[i][j]
+					# x_min,y_min = bbox[1], bbox[2]
+					# x_max,y_max = bbox[3], bbox[4]
+					# ax.plot([x_min,x_min],[y_min,y_max],color='red')
+					# ax.plot([x_min,x_max],[y_min,y_min],color='red')
+					# ax.plot([x_max,x_max],[y_min,y_max],color='red')
+					# ax.plot([x_min,x_max],[y_max,y_max],color='red')
+					# fig_title = '%s, ANN-%s' % (class_to_label_dict, ANNS)
 			ax.axis('off')
 	# if show_xy:
 	# 	fig.text(0.06, 0.5, 'x', va='center', rotation='vertical', fontsize=fontsize)
@@ -196,35 +196,38 @@ def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savenam
 		for f, feat in enumerate(FEATS):
 			f2 = cANN2[:, f]
 			p2, bins = histogram(f2)
-			axs[clabel, f].bar(bins[:-1], p2, align="edge", width=np.diff(bins), alpha=0.5, label=labels[1])
+			axs[clabel, f].bar(bins[:-1], p2, align="edge", width=np.diff(bins), color='k', alpha=0.5, label=labels[1])
 
 			f1 = cANN1[:, f]
 			p1, bins = histogram(f1)
-			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), alpha=0.5, label=labels[0])
+			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), color='red', alpha=0.5, label=labels[0])
 			axs[clabel, f].set_ylim([0,0.7])
 			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-10)
 			wdist[clabel, f] = wasserstein_distance(f1, f2)
 			odist[clabel, f] = overlap_index(f1, f2)#distance_function(f1, f2)
+			ylim = [0, 0.2]
+			axs[clabel, f].set_ylim(ylim)
 			if '6' in FEATS[f]: # == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
 				axs[clabel, f].set_xticks(f_spread[::75])
-				# axs[clabel, f].text(120, 0.90, r'$W^%d(P_{T})-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				# axs[clabel, f].text(120, 0.75, r'$D^%d(P_{T})-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				# axs[clabel, f].text(110, 0.60, r'$W^%d-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
+				axs[clabel, f].text(115, 0.16, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 			else: #coordinates
 				f_spread = np.arange(0, dim + 1)
 				axs[clabel, f].set_xticks(f_spread[::64])
-				# axs[clabel, f].text(20, 0.90, r'$W^%d(P_{T})-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				# axs[clabel, f].text(20, 0.75, r'$D^%d(P_{T})-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				# axs[clabel, f].text(10, 0.60, r'$W^%d-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
+				axs[clabel, f].text(15, 0.16, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
 			if f == 0:
 				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
-				axs[clabel, f].set_yticks([0.0, 0.3, 0.7])
+				axs[clabel, f].set_yticks(ylim)
 			else:
 				axs[clabel, f].set_yticks([])
 			if clabel == 0:
 				axs[clabel, f].set_title(FEATS[f], fontsize=fontsize-4)
 				axs[clabel, f].set_xticks([])
-	axs[clabel, f-1].legend(loc='upper left', fontsize=fontsize-4, frameon=False)
+	
+	axs[clabel, f-1].legend(bbox_to_anchor=(-0.1, 0.25), loc='lower left', fontsize=fontsize-4, frameon=False, borderaxespad=None)
 	# handles, labels = axs[clabel, f].get_legend_handles_labels()
 	# fig.legend(handles, labels, loc='lower right', fontsize=fontsize)
 	fig.savefig(savename, bbox_inches='tight')

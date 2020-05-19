@@ -57,29 +57,70 @@ def record_distances(prefix, wdist, odist, mode, fname):
 		f.write('\n')
 		f.write(np.array2string(odist, formatter={'float_kind':lambda x: '%.2f' % x}, separator=' & '))
 		f.write('\n')
+		f.write('%0.2f & %0.2f' % (wdist.mean(), odist.mean()))
+		f.write('\n')
 
 
-def distance_summary(wdist_mu, odist_mu, aurocs, net_names, axs, fontsize=24):	
+def distance_summary(wdist_mu, odist_mu, aurocs, test_accs, net_names, axs, fontsize=24):
+	
 	width = 0.2 
 	ticks = np.arange(len(net_names))
-	axs.bar(ticks - width/2, wdist_mu, width, color='r', label='Mean Wasserstein')
-	ax1 = axs.twinx()
-	ax1.bar(ticks + width/2, odist_mu, width, label='Mean Overlap')
-	ax1.plot(ticks, aurocs, color='k', label='AUROC')
-
+	axs.bar(ticks - width/2, odist_mu, width, label='Mean Overlap')
 	axs.set_xticks(ticks)
 	axs.set_xticklabels(net_names)
 	axs.tick_params(axis='both', which='major', labelsize=fontsize-4)
+	axs.set_ylabel('Overlap index', labelpad=-5, fontsize=fontsize-4)	
+	axs.yaxis.set_label_coords(-0.01, 0.5)
+	axs_lim = [0.2, 0.7]
+	axs.set_ylim(axs_lim)
+	axs.set_yticks(axs_lim)
+
+	
+	
+	ax1 = axs.twinx()
+	ax1.bar(ticks + width/2, wdist_mu, width, color='r', label='Mean Wasserstein')	
 	ax1.tick_params(axis='both', which='major', labelsize=fontsize-4)
-	axs.set_ylim([0, 15])
-	ax1.set_ylim([0, 1.2])
-	axs.set_yticks([0, 5, 10])
-	ax1.set_yticks([0, 0.5, 1.0])
-	lines, labels = ax1.get_legend_handles_labels()
-	lines2, labels2 = axs.get_legend_handles_labels()
-	ax1.legend(lines + lines2, labels + labels2, fontsize=fontsize-4, loc='upper left', frameon=False, ncol=3)
-	axs.set_ylabel('Wasserstein distance', labelpad=5, fontsize=fontsize)
-	ax1.set_ylabel('Overlap index', labelpad=5, fontsize=fontsize)
+	ax1.set_ylabel('Wasserstein distance', labelpad=0, fontsize=fontsize-4)
+	ax1.yaxis.set_label_coords(1.01, 0.5)
+	ax1_lim = [5, 30]
+	ax1.set_ylim(ax1_lim)
+	ax1.set_yticks(ax1_lim)
+
+	ax2 = axs.twinx()
+	ax2.plot(ticks[1:], aurocs, color='k', label='AUROC')	
+	ax2.tick_params(axis='both', which='major', labelsize=fontsize-4)
+	ax2.spines['right'].set_position(('outward', 40))
+	ax2.set_ylabel('AUROC', fontsize=fontsize-4)
+	ax2.yaxis.set_label_coords(1.07, 0.5)
+	ax2_lim = [0.6, 0.9]
+	ax2.set_ylim(ax2_lim)
+	ax2.set_yticks(ax2_lim)
+
+	# ax3 = axs.twinx()
+	# ax3.plot(ticks, test_accs, '--', color='k', label='Test acc.')
+	# ax3_lim = [0.9, 1.0]
+	# ax3.set_ylim(ax3_lim)
+	# ax3.set_yticks(ax3_lim)
+	# ax3.spines['right'].set_position(('outward', 80))
+	# ax3.set_ylabel('Test acc.', labelpad=5, fontsize=fontsize-4)
+	# ax3.yaxis.set_label_coords(1.13, 0.5)
+	# ax3.tick_params(axis='both', which='major', labelsize=fontsize-4)
+
+	
+	
+	# ax1.set_ylim([0, 1.2])
+	
+	# ax1.set_yticks([0, 0.5, 1.0])
+	lines, labels = axs.get_legend_handles_labels()
+	lines1, labels1 = ax1.get_legend_handles_labels()
+	lines2, labels2 = ax2.get_legend_handles_labels()
+	# lines3, labels3 = ax3.get_legend_handles_labels()
+	
+	ax1.legend(lines2 + lines + lines1, labels2 + labels + labels1, fontsize=fontsize-4, loc='upper left', frameon=False, ncol=3)
+	
+	
+	
+	
 
 
 def assess_pseudo_labeling(tag, SHAP, IDODS):
@@ -122,40 +163,44 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 			F, S  = cann[:, f], shap[:, f]
 			f2 = F[S > 0]
 			p2, bins2 = histogram(f2)
-			axs[clabel, f].bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), alpha=0.5, label=r'$\widehat{P}_{\mathcal{S}}$')
+			axs[clabel, f].bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), color='k', alpha=0.5, label=r'$P^+_{\mathcal{T}}$')
 
 			f1 = oann[:, f]
 			p1, bins1 = histogram(f1)
-			axs[clabel, f].bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), alpha=0.5, label=r'$\widetilde{P}_{\mathcal{S}}$')
-			axs[clabel, f].set_ylim([0, 0.5])
+			axs[clabel, f].bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), color='red', alpha=0.5, label=r'$P_{\mathcal{S}}$')
+			ylim = [0, 0.2]
+			axs[clabel, f].set_ylim(ylim)
 			wdist[clabel, f] = wasserstein_distance(f1, f2)
 			odist[clabel, f] = annotations.overlap_index(f1, f2) #annotations.distance_function(f1, f2)
 			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
 			
-			if f == 0 and clabel == 0 and (not overlap_ax is None):
-				overlap_ax.bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), alpha=0.5)				
-				overlap_ax.bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), alpha=0.5)				
-				overlap_ax.text(20, 0.45, r'$D^%d_W(\widehat{P}_{S})-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				overlap_ax.text(20, 0.35, r'$D^%d_V(\widehat{P}_{S})-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+			#if f == 3 and clabel == 0 and (not overlap_ax is None):
+			if f == 1 and clabel == 1 and (not overlap_ax is None):
+				overlap_ax.bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), color='k', alpha=0.5, label=r'$P^+_{\mathcal{T}}$')
+				overlap_ax.bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), color='red', alpha=0.5, label=r'$P_{\mathcal{S}}$')
+				overlap_ax.text(30, 0.175, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
+				overlap_ax.text(30, 0.150, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
 				overlap_ax.set_title(annotations.FEATS[f], fontsize=fontsize)
-				overlap_ax.set_ylim([0, 0.5])
+				overlap_ax.set_ylim(ylim)
+				overlap_ax.set_yticks(ylim)
 				overlap_ax.set_xlim([0, 60])
 				overlap_ax.tick_params(axis='both', which='major', labelsize=fontsize-12)
 
 			if '6' in feat: # == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
-				axs[clabel, f].set_xticks(f_spread[::75])
-				# axs[clabel, f].text(140, 0.9, r'$W^%d(\widehat{P}_{S})-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				# axs[clabel, f].text(140, 0.7, r'$D^%d(\widehat{P}_{S})-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				axs[clabel, f].set_xlim([100, 255])
+				axs[clabel, f].set_xticks([120, 180, 255])
+				# axs[clabel, f].text(110, 0.25, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
+				# axs[clabel, f].text(110, 0.15, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 			else: #coordinates
 				f_spread = np.arange(0, dim + 1)
 				axs[clabel, f].set_xticks(f_spread[::64])
-				# axs[clabel, f].text(40, 0.9, r'$W^%d(\widehat{P}_{S})-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				# axs[clabel, f].text(40, 0.7, r'$D^%d(\widehat{P}_{S})-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				# axs[clabel, f].text(10, 0.25, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
+				# axs[clabel, f].text(10, 0.15, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
 			if f == 0:
 				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
-				axs[clabel, f].set_yticks([0.0, 0.5])
+				axs[clabel, f].set_yticks(ylim)
 			else:
 				axs[clabel, f].set_yticks([])
 			if clabel == 0:
@@ -163,7 +208,7 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 				axs[clabel, f].set_xticks([])
 	# handles, labels = axs[clabel, f].get_legend_handles_labels()
 	# fig.legend(handles, labels, loc='lower right', fontsize=fontsize-4)
-	axs[clabel, f-1].legend(loc='upper left', fontsize=fontsize-4, frameon=False)
+	axs[clabel, f-1].legend(bbox_to_anchor=(-0.165, 0.3), loc='lower left', fontsize=fontsize, frameon=False)
 	fig.savefig(savename, bbox_inches='tight')
 	plt.close()
 	return wdist, odist
@@ -265,16 +310,48 @@ def _confusion_matrix(scores, id_ind, od_ind, threshold):
 		return np.stack(cmat)
 
 
-def roc_summary(UNC, idod, axs, net_name, fontsize=25, figsize=(30,15)):
-		id_ind = np.where(idod == annotations.id_label)[0]
-		od_ind = np.where(idod == annotations.od_label)[0]
-		threshold = np.linspace(0.5,1, num=20)
-		cmat =  _confusion_matrix(UNC, id_ind, od_ind, threshold)
-		auroc = auc(cmat[:,2], cmat[:,0])
-		axs.plot(cmat[:,2], cmat[:,0],
-				label='%s, AUROC-%0.3f' % (net_name,auroc))
-		axs.tick_params(axis='both', which='major', labelsize=fontsize-10)
-		return auroc
+def get_auroc(UNC, idod):
+	id_ind = np.where(idod == annotations.id_label)[0]
+	od_ind = np.where(idod == annotations.od_label)[0]
+	threshold = np.linspace(0.5,1, num=20)
+	cmat =  _confusion_matrix(UNC, id_ind, od_ind, threshold)
+	auroc = auc(cmat[:,2], cmat[:,0])
+	return auroc
+
+def roc_summary(aurocs, test_accs, ax1, fontsize, width=0.2):	
+	ticks = np.arange(len(aurocs))
+	print(ticks)
+	ax1.bar(ticks-width/2, aurocs, width, color='k', label='AUROC')
+	ax1.set_ylabel('AUROC', fontsize=fontsize)
+	ax1.set_xticks(ticks)
+	ax1_lim = [0.5, 1]
+	ax1.set_ylim(ax1_lim)
+	ax1.set_yticks([0.6, 0.8, 1])
+	ax1.tick_params(axis='both', which='major', labelsize=fontsize-10)
+	
+	ax2 = ax1.twinx()
+	ax2.bar(ticks+width/2, test_accs, width, color='b', label='Test Acc.')
+	ax2.set_ylabel('Test Acc.', fontsize=fontsize)
+	ax2_lim = [0.9, 1]
+	ax2.set_ylim([0.9, 1])
+	ax2.set_yticks([0.9, 0.95, 1])
+	ax2.tick_params(axis='both', which='major', labelsize=fontsize-10)
+
+	lines1, labels1 = ax1.get_legend_handles_labels()	
+	lines2, labels2 = ax2.get_legend_handles_labels()	
+	ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=fontsize-4, loc='upper left', frameon=False, ncol=2)
+
+
+# def roc_summary(UNC, idod, axs, net_name, fontsize=25, figsize=(30,15)):
+# 		id_ind = np.where(idod == annotations.id_label)[0]
+# 		od_ind = np.where(idod == annotations.od_label)[0]
+# 		threshold = np.linspace(0.5,1, num=20)
+# 		cmat =  _confusion_matrix(UNC, id_ind, od_ind, threshold)
+# 		auroc = auc(cmat[:,2], cmat[:,0])
+# 		axs.plot(cmat[:,2], cmat[:,0],
+# 				label='%s, AUROC-%0.3f' % (net_name,auroc))
+# 		axs.tick_params(axis='both', which='major', labelsize=fontsize-10)
+# 		return auroc
 
 def roc_net(PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30,15)):
 		id_ind = np.where(idod == annotations.id_label)[0]
@@ -335,7 +412,15 @@ def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=
 		SHAP 		= dtree.predict(xgboost.DMatrix(X, feature_names=annotations.FEATS), pred_contribs=True) #shap.TreeExplainer(dtree).shap_values(X)
 		axs[clabel, 0].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
 		for f, feat in enumerate(annotations.FEATS):
-			axs[clabel, f].scatter(X[feat], SHAP[:,f])			
+			x = X[feat]
+			y = SHAP[:,f]
+			x_ = np.unique(x)
+			# color = [str(item/255.) for item in y]
+			# color = ['k' if item >= 0 else '0.75' for item in y]			
+			# axs[clabel, f].scatter(x, y, c=color, cmap='Greys')
+			axs[clabel, f].plot(x[y>=0], y[y>=0], '.', rasterized=True, c='k')
+			axs[clabel, f].plot(x[y<0], y[y<0], '.', rasterized=True, c='0.75')
+			axs[clabel, f].plot(x_, np.zeros_like(x_), color='r')
 			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
 			axs[clabel, f].set_ylim([-0.15, 0.06])
 			if f != 0:

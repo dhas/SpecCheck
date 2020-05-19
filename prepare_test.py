@@ -25,7 +25,7 @@ def overlap_metric_example(savename):
 	plot_ind = [(0,0), (0,1), (1,0), (1,1)]
 	V_dists = [1, 0.76, -0.48, 0.35]
 	fig, ax = plt.subplots(2, 2, figsize=(12, 6))
-
+	titles = ['No overlap', 'Partial overlap', 'Containment', 'Partial overlap']
 	for idx, blue_limits in enumerate(blue_plot_limits):
 		lower_xplot_limit_blue = blue_limits[0]
 		upper_xplot_limit_blue = blue_limits[1]
@@ -61,13 +61,13 @@ def overlap_metric_example(savename):
 		plot_y2 = plot_y2 / area2[0]
 		area22 = np.trapz(plot_y2)
 
-		ax[subplot_ind].plot(plot_x1,plot_y1, 'tab:orange', label=r'$P_X$')
+		ax[subplot_ind].plot(plot_x1,plot_y1, 'red', label=r'$P_X$')
 		ax[subplot_ind].plot([min(lower_xplot_limit_blue, lower_xplot_limit_orange) -0.5, max(upper_xplot_limit_orange,upper_xplot_limit_blue) + 0.5], 2*[0], 'k')
 
 
-		ax[subplot_ind].fill_between(plot_x1, plot_x1.shape[0]*[0], plot_y1, facecolor = 'tab:orange', alpha = alpha_orange)
-		ax[subplot_ind].plot(plot_x2,plot_y2, 'b', label=r'$P_Y$')
-		ax[subplot_ind].fill_between(plot_x2, plot_x2.shape[0]*[0], plot_y2, facecolor = 'b', alpha = alpha_blue)
+		ax[subplot_ind].fill_between(plot_x1, plot_x1.shape[0]*[0], plot_y1, facecolor = 'red', alpha = alpha_orange)
+		ax[subplot_ind].plot(plot_x2,plot_y2, 'k', label=r'$P_Y$')
+		ax[subplot_ind].fill_between(plot_x2, plot_x2.shape[0]*[0], plot_y2, facecolor = 'k', alpha = alpha_blue)
 
 		ax[subplot_ind].set_ylim(y_lim_lower, y_lim_upper)
 
@@ -75,11 +75,18 @@ def overlap_metric_example(savename):
 		ax[subplot_ind].axvline(upper_xplot_limit_orange,0.002,0.04, color = 'k')
 		ax[subplot_ind].axvline(lower_xplot_limit_blue,0.002,0.04, color = 'k')
 		ax[subplot_ind].axvline(upper_xplot_limit_blue,0.002,0.04, color = 'k')
-		ax[subplot_ind].text(V_text_x_placement, V_text_y_placement, 'V = {}'.format(V_dists[idx]), size = text_size)
-		ax[subplot_ind].set_xlim(x_lim_lower, x_lim_upper)		
+		ax[subplot_ind].text(V_text_x_placement, V_text_y_placement, '{}, V = {}'.format(titles[idx], V_dists[idx]), size = text_size)
+		ax[subplot_ind].set_xlim(x_lim_lower, x_lim_upper)
+		ax[subplot_ind].tick_params(axis='both', which='major', labelsize=text_size-4)
+
+
+		# if idx < 2:
+		# 	ax[subplot_ind].set_title(titles[idx], fontsize=text_size)
+		# else:
+		# 	ax[subplot_ind].set_xlabel(titles[idx], fontsize=text_size)
 	#ax[subplot_ind].axis('off')
 
-	ax[subplot_ind].legend(loc='upper right', fontsize=text_size)
+	ax[subplot_ind].legend(loc='center right', fontsize=text_size, frameon=False)
 	fig.savefig(savename, bbox_inches='tight')
 
 
@@ -150,8 +157,8 @@ def get_optimizer(parameters,settings):
 		raise Exception('Unknown optimizer')
 	return optimizer
 
-def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
-	encoders_root = test_root/cfg['root']
+def prepare_encoders(cfg, dim, num_classes, ds_root, test_root, iteration):
+	encoders_root = test_root/cfg['root']/('%d' % iteration)
 	encoders_root.mkdir(exist_ok=True)
 	
 	ds_settings = load.read_settings(ds_root/'settings.json')
@@ -174,7 +181,7 @@ def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
 			dim, nets[net_name],
 			num_classes)
 		encoder.to(device)
-		summary(encoder,input_shape)
+		# summary(encoder,input_shape)
 
 		train_loader,val_loader = load.get_npy_train_loader(ds_root,
 			train_params['batch_size'],
@@ -182,9 +189,9 @@ def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
 			transforms=ds_trans)
 
 		if not training_necessary(checkpoint_path,nets[net_name],cfg_path):
-			print('Encoder %s already trained' % net_name)
+			print('Encoder %s iteration %d already trained' % (net_name, iteration))
 		else:
-			print('Training encoder %s' % net_name)			
+			print('Training encoder %s iteration %d' % (net_name, iteration))
 			optimizer = get_optimizer(encoder.parameters(), 
 				cfg['train']['optimizer'])
 			trainer = EncoderTrainer(encoder,device,
@@ -194,8 +201,8 @@ def prepare_encoders(cfg, dim, num_classes, ds_root, test_root):
 			trainer.fit(checkpoint_path)
 			pickle.dump(nets[net_name],open(cfg_path,'wb'))
 
-def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, explain_root, fontsize=24):
-	explain_root = explain_root/'encoder_explanations'
+def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, explain_root, iteration, fontsize=24):
+	explain_root = explain_root/cfg['root']/('%d' % iteration)
 	explain_root.mkdir(exist_ok=True)
 
 	CUDA_DEVICE = 0
@@ -208,13 +215,10 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	criterion 	= nn.CrossEntropyLoss()
 	ds_loader 	= load.get_npy_dataloader(ds_root,batch_size,transforms=ds_trans,shuffle=False)
 
-	encoders_root = test_root/cfg['root']
-	cal_encoders  = encoders_root/'cal_encoders'
-	cal_encoders.mkdir(exist_ok=True)
-
+	encoders_root = test_root/cfg['root']/('%d' % iteration)
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
-	figsize = (12, 6)	
+	figsize = (12, 6)
 	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
 	figBaseUNC, axBaseUNC = plt.subplots(2, len(nets), figsize=figsize)
 	figXCalUNC, axXCalUNC = plt.subplots(2, len(nets), figsize=figsize)	
@@ -229,12 +233,13 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	if dists_file.exists():
 		dists_file.unlink()
 
-	wdist_mu = []
-	odist_mu = []
-	aurocs   = []
-	y1_ests  = []
-	for net_ind, net_name in enumerate(nets):
-		print('\nProcessing %s' % net_name)
+	wdist_mu = [23.56]
+	odist_mu = [0.57]
+	st_aurocs = []
+	x_aurocs  = []
+	test_accs = []	
+	for net_ind, net_name in enumerate(['VGG13']):
+		print('\nProcessing %s iteration %d' % (net_name, iteration))
 		encoder = Encoder(net_name,
 				dim,
 				nets[net_name],
@@ -264,8 +269,10 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 				HIT = baseline['HIT']
 			
 			model_hist = pickle.load(open(encoders_root/net_name/'history.pkl', 'rb'))
-			print('QD accuracy %0.2f' % (model_hist['val_history']['accuracy'][-1]))
-			print('SD accuracy %0.2f' % (np.count_nonzero(HIT)/np.size(HIT)))
+			# print('QD accuracy %0.2f' % (model_hist['val_history']['accuracy'][-1]))
+			test_acc = (np.count_nonzero(HIT)/np.size(HIT))
+			# print('SD accuracy %0.2f' % test_acc)
+			test_accs.append(test_acc)
 			_, _, idod = annotations.label_annotation_distribution(os_ann, ANN)			
 			
 			if net_ind == 0:
@@ -291,7 +298,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 			# # explain.shap_summary(SHAP, ANN, net_name, axBaseSHAP)
 
 			
-			# model.softening_summary(ds_loader, explain_root/('%s_1_softening.pdf' % net_name))			
+			model.softening_summary(ds_loader, explain_root/('%s_1_softening.pdf' % net_name))			
 			
 			calibrated_npz = encoders_root/net_name/('%s_calibrated.npz' % net_name)
 			if calibrated_npz.exists():
@@ -306,7 +313,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 				stcalT   = model.calibrate_for_max_spread(ds_loader, thr=0.7)
 
 				T = np.hstack([np.linspace(1, 10, num=10), [xcalT, stcalT]])
-				T = np.hstack([1/T[1:], T])
+				# T = np.hstack([1/T[1:], T])
 				T.sort()
 				cPRD, cHIT, _ = model.evaluate(CUDA_DEVICE,
 					criterion,ds_loader,
@@ -315,48 +322,50 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 					y_ann=ds_ann_npy)
 				np.savez(calibrated_npz, xcalT=xcalT, stcalT=stcalT, T=T, cPRD=cPRD, cHIT=cHIT)
 			
-			xcalUNC = np.max(cPRD[0,T == xcalT][0], axis=1)
-			explain.uncertainty_summary(xcalUNC, idod, 
-				net_name, axXCalUNC[0, net_ind], axXCalUNC[1, net_ind], [r'$\widetilde{Y}^+$', r'$\widetilde{Y}^-$'],
-				T=xcalT, T_label=r'$T_X$', yticks=yticks)
-			explain.roc_summary(xcalUNC, idod, axXCalROC, net_name)
+			# xcalUNC = np.max(cPRD[0,T == xcalT][0], axis=1)
+			# explain.uncertainty_summary(xcalUNC, idod, 
+			# 	net_name, axXCalUNC[0, net_ind], axXCalUNC[1, net_ind], [r'$\widetilde{Y}^+$', r'$\widetilde{Y}^-$'],
+			# 	T=xcalT, T_label=r'$T_X$', yticks=yticks)
+			# # explain.roc_summary(xcalUNC, idod, axXCalROC, net_name)
+			# x_aurocs.append(explain.get_auroc(xcalUNC, idod))
 
 
-			xcal_npz = encoders_root/net_name/('%s_xcal.npz' % net_name)			
-			if xcal_npz.exists():
-				state = np.load(xcal_npz)
-				SHAP  = state['SHAP']
-				ANNS  = state['ANNS']
-			else:
-				ANNS, SHAP, IDODS = explain.contribs_by_feature(xcalUNC, ANN, idod, explain_root/('%s_2_xcal_shap.pdf' % net_name),
-					dtree_savename=explain_root/('%s_2_xcal_dtree.pdf' % net_name))
-				np.savez(xcal_npz, SHAP=SHAP, ANNS=ANNS)
-			wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
-				draw_lims, explain_root/('%s_2_xcal_marginals.pdf' % net_name))
-			explain.record_distances('%s, xcal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')			
+			# xcal_npz = encoders_root/net_name/('%s_xcal.npz' % net_name)			
+			# if xcal_npz.exists():
+			# 	state = np.load(xcal_npz)
+			# 	SHAP  = state['SHAP']
+			# 	ANNS  = state['ANNS']
+			# else:
+			# 	ANNS, SHAP, IDODS = explain.contribs_by_feature(xcalUNC, ANN, idod, explain_root/('%s_2_xcal_shap.pdf' % net_name),
+			# 		dtree_savename=explain_root/('%s_2_xcal_dtree.pdf' % net_name))
+			# 	np.savez(xcal_npz, SHAP=SHAP, ANNS=ANNS)
+			# wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
+			# 	draw_lims, explain_root/('%s_2_xcal_marginals.pdf' % net_name))
+			# explain.record_distances('%s, xcal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')			
 
 			if net_name == 'VGG07':
 				overlap_ax = axOvl[0]
-				overlap_ax.set_xlabel('VGG07', labelpad=10, fontsize=fontsize)
-			elif net_name == 'VGG11':
+				overlap_ax.set_xlabel(net_name, labelpad=10, fontsize=fontsize)
+				overlap_ax.set_ylabel(r'$Y^1=0$', fontsize=fontsize)
+			elif net_name == 'VGG13':
 				overlap_ax = axOvl[1]
-				overlap_ax.set_xlabel('VGG11', labelpad=10, fontsize=fontsize)
+				overlap_ax.set_xlabel(net_name, labelpad=10, fontsize=fontsize)
 			else:
 				overlap_ax = None
 			
 			stcalUNC = np.max(cPRD[0,T == stcalT][0], axis=1)
-			auroc = explain.roc_summary(stcalUNC, idod, axSTCalROC, net_name)
-			aurocs.append(auroc)
+			# auroc = explain.roc_summary(stcalUNC, idod, axSTCalROC, net_name)
+			st_aurocs.append(explain.get_auroc(stcalUNC, idod))
 
 			stcal_npz = encoders_root/net_name/('%s_stcal.npz' % net_name)			
-			if stcal_npz.exists():
+			if False: #stcal_npz.exists():
 				state = np.load(stcal_npz)
 				SHAP  = state['SHAP']
 				ANNS  = state['ANNS']
 			else:
 				ANNS, SHAP, IDODS = explain.contribs_by_feature(stcalUNC, ANN, idod, explain_root/('%s_4_stcal_shap.pdf' % net_name),
 					dtree_savename=explain_root/('%s_4_stcal_dtree.pdf' % net_name))
-				np.savez(stcal_npz, SHAP=SHAP, ANNS=ANNS)
+				# np.savez(stcal_npz, SHAP=SHAP, ANNS=ANNS)
 			wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
 				draw_lims, explain_root/('%s_4_stcal_marginals.pdf' % net_name), overlap_ax=overlap_ax)
 			explain.record_distances('%s, stcal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')
@@ -370,25 +379,68 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	
 
 
-	axXCalROC.legend(fontsize=fontsize-4, loc='lower right')
-	axXCalROC.set_xlabel('False Positive Rate (FPR)', labelpad=15, fontsize=fontsize)
-	axXCalROC.set_ylabel('True Positive Rate (TPR)', labelpad=15, fontsize=fontsize)
-	figXCalROC.savefig(explain_root/'1_xcal_roc.pdf', bbox_inches='tight')
+	
+	# explain.roc_summary(x_aurocs, test_accs, axXCalROC, fontsize)
+	# axXCalROC.set_xticklabels(nets.keys())
+	# # axXCalROC.legend(fontsize=fontsize-4, loc='lower right', frameon=False)
+	# # axXCalROC.set_xlabel('False Positive Rate (FPR)', labelpad=15, fontsize=fontsize)
+	# # axXCalROC.set_ylabel('True Positive Rate (TPR)', labelpad=15, fontsize=fontsize)
+	# figXCalROC.savefig(explain_root/'1_xcal_roc.pdf', bbox_inches='tight')
 
+	explain.roc_summary(st_aurocs, test_accs, axSTCalROC, fontsize)
+	axSTCalROC.set_xticklabels(nets.keys())
 	# axSTCalROC.legend(fontsize=fontsize-4, loc='lower right')
 	# axSTCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
 	# axSTCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
-	# figSTCalROC.savefig(explain_root/'1_stcal_roc.pdf')
+	figSTCalROC.savefig(explain_root/'1_stcal_roc.pdf')
 
-	figOvl.savefig(explain_root/'0_stcal_overlap.pdf')
+	axOvl[1].legend(loc='center right', fontsize=fontsize, frameon=False)
+	figOvl.savefig(explain_root/'0_stcal_overlap.pdf', bbox_inches='tight')
 
 	summary_npz = encoders_root/'summary.npz'
-	if summary_npz.exists():
-		state = np.load(summary_npz)
-		wdist_mu = state['wdist_mu']
-		odist_mu = state['odist_mu']
-		aurocs   = state['aurocs']
-	else:
-		np.savez(summary_npz, wdist_mu=wdist_mu, odist_mu=odist_mu, aurocs=aurocs)	
-	explain.distance_summary(wdist_mu, odist_mu, aurocs, nets.keys(), axSTCalDist)	
-	figSTCalDist.savefig(explain_root/'2_stcal_dist.pdf', bbox_inches='tight')
+	# if summary_npz.exists():
+	# 	state = np.load(summary_npz)
+	# 	wdist_mu = state['wdist_mu']
+	# 	odist_mu = state['odist_mu']
+	# 	aurocs   = state['aurocs']
+	# else:
+	np.savez(summary_npz, wdist_mu=wdist_mu, odist_mu=odist_mu, aurocs=st_aurocs, test_accs=test_accs)
+	# tick_labels = [r'$P_{\mathcal{T}}$'] + list(nets.keys())	
+	# explain.distance_summary(wdist_mu, odist_mu, st_aurocs, test_accs, tick_labels, axSTCalDist)	
+	# figSTCalDist.savefig(explain_root/'2_stcal_dist.pdf', bbox_inches='tight')
+	plt.close()
+
+def explain_set_summary(cfg, test_root, explain_root, num_iters, fontsize=24):
+	explain_root = explain_root/cfg['root']/'summary'
+	explain_root.mkdir(exist_ok=True)
+
+	nets = cfg['nets']
+	figsize = (12, 6)
+	figROC, axROC = plt.subplots(figsize=figsize)
+	figDist, axDist = plt.subplots(figsize=figsize)
+	test_acc = []
+	aurocs   = []
+	wdist    = []
+	odist    = []
+	for iteration in range(num_iters):
+			encoders_root = test_root/cfg['root']/('%d' % iteration)
+			summary_npz = encoders_root/'summary.npz'
+			summary = np.load(summary_npz)
+			test_acc.append(summary['test_accs'])
+			aurocs.append(summary['aurocs'])
+			wdist.append(summary['wdist_mu'])
+			odist.append(summary['odist_mu'])
+
+	print(test_acc)
+	test_acc = np.array(test_acc).mean(axis=0)
+	aurocs   = np.array(aurocs).mean(axis=0)
+	explain.roc_summary(aurocs, test_acc, axROC, fontsize)
+	axROC.set_xticks(range(len(nets)))
+	axROC.set_xticklabels(list(nets.keys()))
+	figROC.savefig(explain_root/'1_stcal_roc.pdf', bbox_inches='tight')
+
+	tick_labels = [r'$P_{\mathcal{T}}$'] + list(nets.keys())
+	wdist = np.array(wdist).mean(axis=0)
+	odist = np.array(odist).mean(axis=0)
+	explain.distance_summary(wdist, odist, aurocs, test_acc, tick_labels, axDist)
+	figDist.savefig(explain_root/'2_stcal_dist.pdf', bbox_inches='tight')
