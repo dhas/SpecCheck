@@ -147,7 +147,7 @@ def assess_pseudo_labeling(tag, SHAP, IDODS):
 
 
 
-def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, labelpad=5, fontsize=24, figsize=(12,6), overlap_ax=None):
+def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, labelpad=5, fontsize=26, figsize=(12,6), overlap_ax=None):
 	os_ann = os_ann[~np.all(os_ann[:,1:] == 0, axis=1)]
 	os_ann = annotations.annotations_list2dict(os_ann)
 
@@ -168,11 +168,11 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 			f1 = oann[:, f]
 			p1, bins1 = histogram(f1)
 			axs[clabel, f].bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), color='red', alpha=0.5, label=r'$P_{\mathcal{S}}$')
-			ylim = [0, 0.2]
+			ylim = [0, 0.3]
 			axs[clabel, f].set_ylim(ylim)
 			wdist[clabel, f] = wasserstein_distance(f1, f2)
 			odist[clabel, f] = annotations.overlap_index(f1, f2) #annotations.distance_function(f1, f2)
-			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
+			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-8)
 			
 			#if f == 3 and clabel == 0 and (not overlap_ax is None):
 			if f == 1 and clabel == 1 and (not overlap_ax is None):
@@ -184,17 +184,18 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 				overlap_ax.set_ylim(ylim)
 				overlap_ax.set_yticks(ylim)
 				overlap_ax.set_xlim([0, 60])
-				overlap_ax.tick_params(axis='both', which='major', labelsize=fontsize-12)
+				overlap_ax.tick_params(axis='both', which='major', labelsize=fontsize-4)
 
 			if '6' in feat: # == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
 				axs[clabel, f].set_xlim([100, 255])
-				axs[clabel, f].set_xticks([120, 180, 255])
+				axs[clabel, f].set_xticks([120, 200])
 				# axs[clabel, f].text(110, 0.25, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
 				# axs[clabel, f].text(110, 0.15, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 			else: #coordinates
 				f_spread = np.arange(0, dim + 1)
-				axs[clabel, f].set_xticks(f_spread[::64])
+				axs[clabel, f].set_xlim([0, 128])
+				axs[clabel, f].set_xticks([0, 80])
 				# axs[clabel, f].text(10, 0.25, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
 				# axs[clabel, f].text(10, 0.15, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
@@ -327,7 +328,7 @@ def roc_summary(aurocs, test_accs, ax1, fontsize, width=0.2):
 	ax1_lim = [0.5, 1]
 	ax1.set_ylim(ax1_lim)
 	ax1.set_yticks([0.6, 0.8, 1])
-	ax1.tick_params(axis='both', which='major', labelsize=fontsize-10)
+	ax1.tick_params(axis='both', which='major', labelsize=fontsize-2)
 	
 	ax2 = ax1.twinx()
 	ax2.bar(ticks+width/2, test_accs, width, color='b', label='Test Acc.')
@@ -335,7 +336,9 @@ def roc_summary(aurocs, test_accs, ax1, fontsize, width=0.2):
 	ax2_lim = [0.9, 1]
 	ax2.set_ylim([0.9, 1])
 	ax2.set_yticks([0.9, 0.95, 1])
-	ax2.tick_params(axis='both', which='major', labelsize=fontsize-10)
+	ax2.tick_params(axis='both', which='major', labelsize=fontsize-2)
+	# ax1.set_xlabel('Classifier variants')
+
 
 	lines1, labels1 = ax1.get_legend_handles_labels()	
 	lines2, labels2 = ax2.get_legend_handles_labels()	
@@ -393,7 +396,7 @@ def roc_net(PRD, idod, T, roc_savename, auroc_savename, fontsize=20, figsize=(30
 		return aurocs
 
 
-def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=24, figsize=(12,6)):
+def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=26, figsize=(12,6)):
 	SHAPS = []
 	ANNS  = []
 	IDODS = []
@@ -414,20 +417,36 @@ def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=
 		for f, feat in enumerate(annotations.FEATS):
 			x = X[feat]
 			y = SHAP[:,f]
-			x_ = np.unique(x)
+			
 			# color = [str(item/255.) for item in y]
 			# color = ['k' if item >= 0 else '0.75' for item in y]			
 			# axs[clabel, f].scatter(x, y, c=color, cmap='Greys')
 			axs[clabel, f].plot(x[y>=0], y[y>=0], '.', rasterized=True, c='k')
-			axs[clabel, f].plot(x[y<0], y[y<0], '.', rasterized=True, c='0.75')
-			axs[clabel, f].plot(x_, np.zeros_like(x_), color='r')
-			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
+			axs[clabel, f].plot(x[y<0], y[y<0], '.', rasterized=True, c='0.75')			
+			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-8)
 			axs[clabel, f].set_ylim([-0.15, 0.06])
 			if f != 0:
 				axs[clabel, f].set_yticks([])
 			if clabel == 0:
 				axs[clabel, f].set_title(feat, fontsize=fontsize-4)
 				axs[clabel, f].set_xticks([])
+			
+			if '6' in feat: # == 'BR':
+				axs[clabel, f].set_xlim([100, 255])
+				x_ = np.linspace(100, 255)
+				axs[clabel, f].plot(x_, np.zeros_like(x_), color='r')
+				if clabel == 1:
+					axs[clabel, f].set_xticks([120, 200])
+				else:
+					axs[clabel, f].set_xticks([])
+			else:
+				axs[clabel, f].set_xlim([0, 120])
+				x_ = np.linspace(0, 120)
+				axs[clabel, f].plot(x_, np.zeros_like(x_), color='r')
+				if clabel == 1:
+					axs[clabel, f].set_xticks([0, 80])
+				else:
+					axs[clabel, f].set_xticks([])
 
 		ANNS.append(ANN[cind, 1:])
 		SHAPS.append(SHAP)
@@ -593,16 +612,20 @@ class TrainedModel:
 		fig, ax1 = plt.subplots(figsize=figsize)
 		l1 = ax1.plot(T, s[:,0], color='blue', label='mean')
 		ax1.set_ylim([0.5, 1.0])
-		ax1.set_ylabel('Mean of S', labelpad=labelpad, fontsize=fontsize)
+		ax1.set_yticks([0.5, 1.0])
+		# ax1.set_xlim([0, 50])
+		ax1.set_xticks([1, 25, 50])
+		ax1.set_ylabel('Mean of S', fontsize=fontsize)
 		ax2 = ax1.twinx()
 		l2 = ax2.plot(T, s[:,1], color='orange', label='variance')
-		ax2.set_ylabel('Variance of S', labelpad=labelpad, fontsize=fontsize)
+		ax2.set_ylabel('Variance of S', fontsize=fontsize)
 		ax1.set_xlabel('Temperature', labelpad=labelpad, fontsize=fontsize)
+		ax2.set_yticks([0.0, 0.02])
 		lns = l1 + l2
 		labs = [l.get_label() for l in lns]
 		ax1.legend(lns, labs, fontsize=fontsize, frameon=False)
-		ax1.tick_params(axis='both', which='major', labelsize=fontsize-10)
-		ax2.tick_params(axis='both', which='major', labelsize=fontsize-10)
+		ax1.tick_params(axis='both', which='major', labelsize=fontsize-4)
+		ax2.tick_params(axis='both', which='major', labelsize=fontsize-4)
 		fig.savefig(savename, bbox_inches='tight')
 
 	# def plot_inout_score_distributions(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):

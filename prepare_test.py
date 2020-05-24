@@ -111,8 +111,8 @@ def sample_dataset(root, savename, ann=None):
 			break
 		return x,y.numpy(),fnames
 
-	batch_size = 10
-	r,c = 2,5
+	batch_size = 8
+	r,c = 2,4
 	
 	loader = load.get_npy_dataloader(root,batch_size)
 	x,y,fnames = _get_one_batch(loader)
@@ -120,11 +120,11 @@ def sample_dataset(root, savename, ann=None):
 
 	if ann is None:
 		annotations.plot_samples(batch_imgs,
-				savename, labels=y.reshape(r,c,1))
+				savename, labels=y.reshape(r,c,1), fontsize=20)
 	else:
 		ann = annotations.get_annotations_for_batch(fnames,ann)
 		annotations.plot_samples(batch_imgs,
-				savename, labels=ann.reshape(r,c,-1))		
+				savename, labels=ann.reshape(r,c,-1), fontsize=20)
 
 def prepare_observed_set(cfg, dim, num_classes, test_root, sources):
 	qd_root = test_root/cfg['root']
@@ -238,7 +238,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	st_aurocs = []
 	x_aurocs  = []
 	test_accs = []	
-	for net_ind, net_name in enumerate(['VGG13']):
+	for net_ind, net_name in enumerate(nets): #enumerate(nets):
 		print('\nProcessing %s iteration %d' % (net_name, iteration))
 		encoder = Encoder(net_name,
 				dim,
@@ -388,7 +388,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	# figXCalROC.savefig(explain_root/'1_xcal_roc.pdf', bbox_inches='tight')
 
 	explain.roc_summary(st_aurocs, test_accs, axSTCalROC, fontsize)
-	axSTCalROC.set_xticklabels(nets.keys())
+	axSTCalROC.set_xticklabels(nets.keys())	
 	# axSTCalROC.legend(fontsize=fontsize-4, loc='lower right')
 	# axSTCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
 	# axSTCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)

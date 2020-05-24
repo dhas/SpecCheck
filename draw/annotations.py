@@ -182,7 +182,7 @@ def overlap_index(x, y):
 
 
 
-def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savename, labelpad=5, fontsize=24, figsize=(12,6)):
+def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savename, labelpad=5, fontsize=26, figsize=(12,6)):
 	ANN1 = ANN1[~np.all(ANN1[:,1:] == 0, axis=1)]
 	ANN2 = ANN2[~np.all(ANN2[:,1:] == 0, axis=1)]
 
@@ -202,21 +202,23 @@ def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savenam
 			p1, bins = histogram(f1)
 			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), color='red', alpha=0.5, label=labels[0])
 			axs[clabel, f].set_ylim([0,0.7])
-			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-10)
+			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-8)
 			wdist[clabel, f] = wasserstein_distance(f1, f2)
 			odist[clabel, f] = overlap_index(f1, f2)#distance_function(f1, f2)
-			ylim = [0, 0.2]
+			ylim = [0, 0.3]
 			axs[clabel, f].set_ylim(ylim)
 			if '6' in FEATS[f]: # == 'BR':
 				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
-				axs[clabel, f].set_xticks(f_spread[::75])
+				axs[clabel, f].set_xlim([100, 255])
+				axs[clabel, f].set_xticks([120, 200])
 				# axs[clabel, f].text(110, 0.60, r'$W^%d-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
-				axs[clabel, f].text(115, 0.16, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
+				axs[clabel, f].text(115, 0.26, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 			else: #coordinates
 				f_spread = np.arange(0, dim + 1)
-				axs[clabel, f].set_xticks(f_spread[::64])
+				axs[clabel, f].set_xlim([0, 128])
+				axs[clabel, f].set_xticks([0, 80])
 				# axs[clabel, f].text(10, 0.60, r'$W^%d-%2.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize-6)
-				axs[clabel, f].text(15, 0.16, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
+				axs[clabel, f].text(15, 0.26, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
 			if f == 0:
 				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
