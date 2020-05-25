@@ -218,14 +218,8 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	encoders_root = test_root/cfg['root']/('%d' % iteration)
 	nets = cfg['nets']
 	num_classes  = len(annotations.classes)
-	figsize = (12, 6)
-	figAUROC, axAUROC = plt.subplots(figsize=(30,10))
-	figBaseUNC, axBaseUNC = plt.subplots(2, len(nets), figsize=figsize)
-	figXCalUNC, axXCalUNC = plt.subplots(2, len(nets), figsize=figsize)	
-	figBaseROC, axBaseROC = plt.subplots(figsize=figsize)
-	figXCalROC, axXCalROC = plt.subplots(figsize=figsize)
-	figSTCalROC, axSTCalROC = plt.subplots(figsize=figsize)
-	figSTCalDist, axSTCalDist = plt.subplots(figsize=figsize)
+	figsize = (12, 6)					
+	figSTCalROC, axSTCalROC = plt.subplots(figsize=figsize)	
 	figOvl, axOvl = plt.subplots(1, 2, figsize=figsize)
 	
 
@@ -279,24 +273,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 				yticks = True
 			else:
 				yticks = False
-
-			# UNC = np.max(PRD[0,0], axis=1)
-			# # explain.uncertainty_summary(UNC, 
-			# # 	idod, net_name,
-			# # 	axBaseUNC[0, net_ind], axBaseUNC[1, net_ind], fix_xlim=False)			
-			# # if net_ind == 0:
-			# # 	axBaseUNC[0, net_ind].set_ylabel(r'$\widetilde{X}^+$', fontsize=fontsize)
-			# # 	axBaseUNC[1, net_ind].set_ylabel(r'$\widetilde{X}^-$', fontsize=fontsize)
-
-			# explain.roc_summary(UNC, idod, axBaseROC, net_name)
-			# ANNS, SHAP, IDODS = explain.contribs_by_feature(UNC, ANN, idod, explain_root/('%s_1_bas_shap.pdf' % net_name),
-			# 	dtree_savename=explain_root/('%s_1_bas_dtree.pdf' % net_name))
-			# wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
-			# 	draw_lims, explain_root/('%s_1_bas_marginals.pdf' % net_name))
-			# explain.record_distances('%s, ucal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')
-			# # explain.assess_pseudo_labeling('ucal', SHAP, IDODS)
-			# # explain.shap_summary(SHAP, ANN, net_name, axBaseSHAP)
-
+			
 			
 			model.softening_summary(ds_loader, explain_root/('%s_1_softening.pdf' % net_name))			
 			
@@ -321,27 +298,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 					var=ds_settings['variance'],
 					y_ann=ds_ann_npy)
 				np.savez(calibrated_npz, xcalT=xcalT, stcalT=stcalT, T=T, cPRD=cPRD, cHIT=cHIT)
-			
-			# xcalUNC = np.max(cPRD[0,T == xcalT][0], axis=1)
-			# explain.uncertainty_summary(xcalUNC, idod, 
-			# 	net_name, axXCalUNC[0, net_ind], axXCalUNC[1, net_ind], [r'$\widetilde{Y}^+$', r'$\widetilde{Y}^-$'],
-			# 	T=xcalT, T_label=r'$T_X$', yticks=yticks)
-			# # explain.roc_summary(xcalUNC, idod, axXCalROC, net_name)
-			# x_aurocs.append(explain.get_auroc(xcalUNC, idod))
-
-
-			# xcal_npz = encoders_root/net_name/('%s_xcal.npz' % net_name)			
-			# if xcal_npz.exists():
-			# 	state = np.load(xcal_npz)
-			# 	SHAP  = state['SHAP']
-			# 	ANNS  = state['ANNS']
-			# else:
-			# 	ANNS, SHAP, IDODS = explain.contribs_by_feature(xcalUNC, ANN, idod, explain_root/('%s_2_xcal_shap.pdf' % net_name),
-			# 		dtree_savename=explain_root/('%s_2_xcal_dtree.pdf' % net_name))
-			# 	np.savez(xcal_npz, SHAP=SHAP, ANNS=ANNS)
-			# wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
-			# 	draw_lims, explain_root/('%s_2_xcal_marginals.pdf' % net_name))
-			# explain.record_distances('%s, xcal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')			
+						
 
 			if net_name == 'VGG07':
 				overlap_ax = axOvl[0]
@@ -353,61 +310,36 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 			else:
 				overlap_ax = None
 			
-			stcalUNC = np.max(cPRD[0,T == stcalT][0], axis=1)
-			# auroc = explain.roc_summary(stcalUNC, idod, axSTCalROC, net_name)
+			stcalUNC = np.max(cPRD[0,T == stcalT][0], axis=1)			
 			st_aurocs.append(explain.get_auroc(stcalUNC, idod))
 
 			stcal_npz = encoders_root/net_name/('%s_stcal.npz' % net_name)			
-			if False: #stcal_npz.exists():
+			if stcal_npz.exists():
 				state = np.load(stcal_npz)
 				SHAP  = state['SHAP']
 				ANNS  = state['ANNS']
 			else:
 				ANNS, SHAP, IDODS = explain.contribs_by_feature(stcalUNC, ANN, idod, explain_root/('%s_4_stcal_shap.pdf' % net_name),
 					dtree_savename=explain_root/('%s_4_stcal_dtree.pdf' % net_name))
-				# np.savez(stcal_npz, SHAP=SHAP, ANNS=ANNS)
+				np.savez(stcal_npz, SHAP=SHAP, ANNS=ANNS)
 			wdist, odist = explain.estimate_marginals_from_shap(SHAP, ANNS, os_ann, dim,
 				draw_lims, explain_root/('%s_4_stcal_marginals.pdf' % net_name), overlap_ax=overlap_ax)
 			explain.record_distances('%s, stcal' % (net_name), wdist, odist, 'a', explain_root/'dist.txt')
 			wdist_mu.append(wdist.mean())
 			odist_mu.append(odist.mean())
-
-
-	axXCalUNC[0, net_ind].legend(loc='upper right', fontsize=fontsize-4, frameon=False)
-	axXCalUNC[1, net_ind].legend(loc='upper right', fontsize=fontsize-4, frameon=False)	
-	figXCalUNC.savefig(explain_root/'0_xcal_uncertainty_summary.pdf', bbox_inches='tight')
 	
-
-
 	
-	# explain.roc_summary(x_aurocs, test_accs, axXCalROC, fontsize)
-	# axXCalROC.set_xticklabels(nets.keys())
-	# # axXCalROC.legend(fontsize=fontsize-4, loc='lower right', frameon=False)
-	# # axXCalROC.set_xlabel('False Positive Rate (FPR)', labelpad=15, fontsize=fontsize)
-	# # axXCalROC.set_ylabel('True Positive Rate (TPR)', labelpad=15, fontsize=fontsize)
-	# figXCalROC.savefig(explain_root/'1_xcal_roc.pdf', bbox_inches='tight')
-
+	
 	explain.roc_summary(st_aurocs, test_accs, axSTCalROC, fontsize)
-	axSTCalROC.set_xticklabels(nets.keys())	
-	# axSTCalROC.legend(fontsize=fontsize-4, loc='lower right')
-	# axSTCalROC.set_xlabel('False Positive Rate (FPR)', fontsize=fontsize)
-	# axSTCalROC.set_ylabel('True Positive Rate (TPR)', fontsize=fontsize)
+	axSTCalROC.set_xticklabels(nets.keys())		
 	figSTCalROC.savefig(explain_root/'1_stcal_roc.pdf')
 
 	axOvl[1].legend(loc='center right', fontsize=fontsize, frameon=False)
 	figOvl.savefig(explain_root/'0_stcal_overlap.pdf', bbox_inches='tight')
 
 	summary_npz = encoders_root/'summary.npz'
-	# if summary_npz.exists():
-	# 	state = np.load(summary_npz)
-	# 	wdist_mu = state['wdist_mu']
-	# 	odist_mu = state['odist_mu']
-	# 	aurocs   = state['aurocs']
-	# else:
-	np.savez(summary_npz, wdist_mu=wdist_mu, odist_mu=odist_mu, aurocs=st_aurocs, test_accs=test_accs)
-	# tick_labels = [r'$P_{\mathcal{T}}$'] + list(nets.keys())	
-	# explain.distance_summary(wdist_mu, odist_mu, st_aurocs, test_accs, tick_labels, axSTCalDist)	
-	# figSTCalDist.savefig(explain_root/'2_stcal_dist.pdf', bbox_inches='tight')
+	if not summary_npz.exists():
+		np.savez(summary_npz, wdist_mu=wdist_mu, odist_mu=odist_mu, aurocs=st_aurocs, test_accs=test_accs)	
 	plt.close()
 
 def explain_set_summary(cfg, test_root, explain_root, num_iters, fontsize=24):
@@ -430,8 +362,7 @@ def explain_set_summary(cfg, test_root, explain_root, num_iters, fontsize=24):
 			aurocs.append(summary['aurocs'])
 			wdist.append(summary['wdist_mu'])
 			odist.append(summary['odist_mu'])
-
-	print(test_acc)
+	
 	test_acc = np.array(test_acc).mean(axis=0)
 	aurocs   = np.array(aurocs).mean(axis=0)
 	explain.roc_summary(aurocs, test_acc, axROC, fontsize)

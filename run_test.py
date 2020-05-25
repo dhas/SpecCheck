@@ -35,24 +35,24 @@ def run_test(tests_root, sources, test_config):
 	cs_cfg['draw_limits'], test_cfg['dim'], out_dir/'2_os_cs_ann.pdf')
 	record_distances('P_T', wdist, odist, 'w', out_dir/'dist.txt')
 
-	# os_root = test_root/os_cfg['root']
-	# cs_root = test_root/cs_cfg['root']
-	# enc_cfg = test_cfg['encoders']
-	# num_iters = test_cfg['num_iters']
-	# for enc_set in ['set01']:#enc_cfg:
-	# 	set_cfg = enc_cfg[enc_set]
-	# 	for iteration in range(num_iters):
-	# 		print('Processing %s' % enc_set)		
-	# 		# prepare_encoders(set_cfg, test_cfg['dim'], 
-	# 		# 	test_cfg['num_classes'], 
-	# 		# 	os_root, test_root, iteration)
-	# 		explain_with_encoder_set(set_cfg, cs_root,
-	# 			np.load(os_root/'labels.npy'),
-	# 			test_cfg['dim'],
-	# 			cs_cfg['draw_limits'],
-	# 			test_root, out_dir, iteration)		
-	# 	explain_set_summary(set_cfg, test_root, 
-	# 		out_dir, num_iters)
+	os_root = test_root/os_cfg['root']
+	cs_root = test_root/cs_cfg['root']
+	enc_cfg = test_cfg['encoders']
+	num_iters = test_cfg['num_iters']
+	for enc_set in enc_cfg:
+		set_cfg = enc_cfg[enc_set]
+		for iteration in range(num_iters):
+			print('Processing %s' % enc_set)		
+			prepare_encoders(set_cfg, test_cfg['dim'], 
+				test_cfg['num_classes'], 
+				os_root, test_root, iteration)
+			explain_with_encoder_set(set_cfg, cs_root,
+				np.load(os_root/'labels.npy'),
+				test_cfg['dim'],
+				cs_cfg['draw_limits'],
+				test_root, out_dir, iteration)		
+		explain_set_summary(set_cfg, test_root, 
+			out_dir, num_iters)
 
 
 if __name__ == '__main__':
