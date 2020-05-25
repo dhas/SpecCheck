@@ -5,7 +5,6 @@ import pickle
 from tqdm import tqdm
 import sys
 sys.path.append('..')
-from utils import other_utils
 
 def training_necessary(checkpoint_path,cfg,cfg_path):	
 	training_needed = (not checkpoint_path.exists()) or \

@@ -11,7 +11,6 @@ import torch
 from torch.autograd import Variable
 from torch.nn import functional as F
 sys.path.append('..')
-from utils import other_utils
 from draw import load, annotations
 from ood.calibration import ModelWithTemperature
 from sklearn.metrics import auc
@@ -320,8 +319,7 @@ def get_auroc(UNC, idod):
 	return auroc
 
 def roc_summary(aurocs, test_accs, ax1, fontsize, width=0.2):	
-	ticks = np.arange(len(aurocs))
-	print(ticks)
+	ticks = np.arange(len(aurocs))	
 	ax1.bar(ticks-width/2, aurocs, width, color='k', label='AUROC')
 	ax1.set_ylabel('AUROC', fontsize=fontsize)
 	ax1.set_xticks(ticks)

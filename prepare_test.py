@@ -8,7 +8,6 @@ from torchsummary import summary
 from draw.quick_draw import QuickDraw
 from draw.spec_draw import SpecDraw
 from draw import load, annotations
-from utils import other_utils
 from ood.encoder import Encoder
 from ood.train import EncoderTrainer, training_necessary
 import ood.explainV2 as explain
@@ -105,6 +104,12 @@ def sources_available(sources,sources_url):
 	return srcs_present
 
 def sample_dataset(root, savename, ann=None):
+	def as_rows_and_cols(imgs,r,c):
+		assert(r*c == imgs.shape[0])
+		nchannels = imgs.shape[-1]
+		side = imgs.shape[-2]
+		return imgs.reshape(r,c,side,side,nchannels)
+	
 	def _get_one_batch(loader):
 		for batch in loader:
 			x,y,fnames = batch			
@@ -116,7 +121,7 @@ def sample_dataset(root, savename, ann=None):
 	
 	loader = load.get_npy_dataloader(root,batch_size)
 	x,y,fnames = _get_one_batch(loader)
-	batch_imgs   = other_utils.as_rows_and_cols(x,r,c)
+	batch_imgs   = as_rows_and_cols(x,r,c)
 
 	if ann is None:
 		annotations.plot_samples(batch_imgs,
