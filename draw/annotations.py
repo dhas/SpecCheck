@@ -221,7 +221,7 @@ def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savenam
 				axs[clabel, f].text(15, 0.26, r'$V^%d-%2.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
 			if f == 0:
-				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
+				axs[clabel, f].set_ylabel(r'$P(Y^j|Y^1=%d)$' % clabel, fontsize=fontsize-4)
 				axs[clabel, f].set_yticks(ylim)
 			else:
 				axs[clabel, f].set_yticks([])

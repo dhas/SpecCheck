@@ -319,7 +319,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 			st_aurocs.append(explain.get_auroc(stcalUNC, idod))
 
 			stcal_npz = encoders_root/net_name/('%s_stcal.npz' % net_name)			
-			if stcal_npz.exists():
+			if False:#stcal_npz.exists():
 				state = np.load(stcal_npz)
 				SHAP  = state['SHAP']
 				ANNS  = state['ANNS']
@@ -347,7 +347,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 		np.savez(summary_npz, wdist_mu=wdist_mu, odist_mu=odist_mu, aurocs=st_aurocs, test_accs=test_accs)	
 	plt.close()
 
-def explain_set_summary(cfg, test_root, explain_root, num_iters, fontsize=24):
+def explain_set_summary(cfg, test_root, explain_root, num_iters, labelpad=15, fontsize=24):
 	explain_root = explain_root/cfg['root']/'summary'
 	explain_root.mkdir(exist_ok=True)
 
@@ -373,10 +373,12 @@ def explain_set_summary(cfg, test_root, explain_root, num_iters, fontsize=24):
 	explain.roc_summary(aurocs, test_acc, axROC, fontsize)
 	axROC.set_xticks(range(len(nets)))
 	axROC.set_xticklabels(list(nets.keys()))
+	axROC.set_xlabel('Classifier configuration', labelpad=labelpad, fontsize=fontsize)
 	figROC.savefig(explain_root/'1_stcal_roc.pdf', bbox_inches='tight')
 
 	tick_labels = [r'$P_{\mathcal{T}}$'] + list(nets.keys())
 	wdist = np.array(wdist).mean(axis=0)
 	odist = np.array(odist).mean(axis=0)
 	explain.distance_summary(wdist, odist, aurocs, test_acc, tick_labels, axDist)
+	axDist.set_xlabel(r'$P_{\mathcal{T}}^+$', labelpad=labelpad, fontsize=fontsize+4)
 	figDist.savefig(explain_root/'2_stcal_dist.pdf', bbox_inches='tight')

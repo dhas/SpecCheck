@@ -38,8 +38,8 @@ def run_test(tests_root, sources, test_config):
 	os_root = test_root/os_cfg['root']
 	cs_root = test_root/cs_cfg['root']
 	enc_cfg = test_cfg['encoders']
-	num_iters = 1#test_cfg['num_iters']
-	for enc_set in ['set01']:#enc_cfg:
+	num_iters = test_cfg['num_iters']
+	for enc_set in enc_cfg:
 		set_cfg = enc_cfg[enc_set]
 		for iteration in range(num_iters):
 			print('Processing %s' % enc_set)		

@@ -11,7 +11,7 @@ def load_config(config_path):
 
 
 
-test_config = '../config/epochs_test_draw_128.yml'
+test_config = '../config/test_draw_128.yml'
 test_cfg = load_config(test_config)
 test_root = Path('../_tests')/test_cfg['test_root']
 enc_cfg = test_cfg['encoders']
@@ -67,6 +67,7 @@ axROC.set_yticks([0.5, 0.7, 1.0])
 axROC.set_xticks(range(len(tick_labels)))
 axROC.set_xticklabels(tick_labels)
 axROC.set_ylabel('AUROC', fontsize=fontsize)
+axROC.set_xlabel('Classifier configuration', labelpad=15, fontsize=fontsize)
 axROC.tick_params(axis='both', which='major', labelsize=fontsize-2)
 taxROC.set_ylabel('Test acc.', fontsize=fontsize)
 taxROC.tick_params(axis='both', which='major', labelsize=fontsize-2)

@@ -199,7 +199,7 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 				# axs[clabel, f].text(10, 0.15, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize-6)
 
 			if f == 0:
-				axs[clabel, f].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
+				axs[clabel, f].set_ylabel(r'$P(Y^j|Y^1=%d)$' % clabel, fontsize=fontsize)
 				axs[clabel, f].set_yticks(ylim)
 			else:
 				axs[clabel, f].set_yticks([])
@@ -411,7 +411,7 @@ def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=
 		# 	xgboost.plot_tree(dtree, rankdir='LR', ax=dtree_ax[clabel])
 		# 	dtree_ax[clabel].set_title(cname, fontsize=fontsize)
 		SHAP 		= dtree.predict(xgboost.DMatrix(X, feature_names=annotations.FEATS), pred_contribs=True) #shap.TreeExplainer(dtree).shap_values(X)
-		axs[clabel, 0].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
+		axs[clabel, 0].set_ylabel(r'$\phi(Y^j|Y^1=%d)$' % clabel, fontsize=fontsize)
 		for f, feat in enumerate(annotations.FEATS):
 			x = X[feat]
 			y = SHAP[:,f]
