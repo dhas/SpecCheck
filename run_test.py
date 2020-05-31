@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse
 from draw.annotations import compare_annotation_distributions
 from prepare_test import overlap_metric_example, prepare_observed_set, prepare_coverage_set, prepare_encoders, explain_with_encoder_set, explain_set_summary
-from ood.explainV2 import get_feature_KL, record_distances
+from ood.explainV2 import record_distances
 
 def load_config(config_path):
 	return yaml.load(open(config_path), Loader=yaml.FullLoader)
@@ -39,7 +39,7 @@ def run_test(tests_root, sources, test_config):
 	cs_root = test_root/cs_cfg['root']
 	enc_cfg = test_cfg['encoders']
 	num_iters = test_cfg['num_iters']
-	for enc_set in enc_cfg:
+	for enc_set in ['set01']: #enc_cfg:
 		set_cfg = enc_cfg[enc_set]
 		for iteration in range(num_iters):
 			print('Processing %s' % enc_set)		

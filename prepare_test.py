@@ -237,7 +237,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 	st_aurocs = []
 	x_aurocs  = []
 	test_accs = []	
-	for net_ind, net_name in enumerate(nets): #enumerate(nets):
+	for net_ind, net_name in enumerate(nets):
 		print('\nProcessing %s iteration %d' % (net_name, iteration))
 		encoder = Encoder(net_name,
 				dim,
@@ -308,7 +308,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 			if net_name == 'VGG07':
 				overlap_ax = axOvl[0]
 				overlap_ax.set_xlabel(net_name, labelpad=10, fontsize=fontsize)
-				overlap_ax.set_ylabel(r'$Y^1=0$', fontsize=fontsize)
+				overlap_ax.set_ylabel(r'$P(Y^3|Y^1=0)$', fontsize=fontsize)				
 			elif net_name == 'VGG13':
 				overlap_ax = axOvl[1]
 				overlap_ax.set_xlabel(net_name, labelpad=10, fontsize=fontsize)
@@ -319,7 +319,7 @@ def explain_with_encoder_set(cfg, ds_root, os_ann, dim, draw_lims, test_root, ex
 			st_aurocs.append(explain.get_auroc(stcalUNC, idod))
 
 			stcal_npz = encoders_root/net_name/('%s_stcal.npz' % net_name)			
-			if False:#stcal_npz.exists():
+			if stcal_npz.exists():
 				state = np.load(stcal_npz)
 				SHAP  = state['SHAP']
 				ANNS  = state['ANNS']

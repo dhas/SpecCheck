@@ -6,7 +6,6 @@ from tqdm import tqdm
 import sys
 import xgboost
 import graphviz
-import shap
 import torch
 from torch.autograd import Variable
 from torch.nn import functional as F
@@ -16,32 +15,6 @@ from ood.calibration import ModelWithTemperature
 from sklearn.metrics import auc
 from scipy.stats import wasserstein_distance
 from scipy.spatial.distance import jensenshannon
-
-def get_feature_KL(os_ann, cs_ann, eps=0.00001):
-	num_classes = len(annotations.classes)
-	num_feats = len(annotations.FEATS)
-	fkl = np.empty((num_classes, num_feats), 
-		dtype=np.float)
-	bins = 50
-	for clabel in range(num_classes):
-		os = os_ann[os_ann[:,annotations.ANN_COL_CL] == clabel, 1:]
-		cs = cs_ann[cs_ann[:,annotations.ANN_COL_CL] == clabel, 1:]
-		for f_ind in range(num_feats):
-			p, bins = np.histogram(os[:,f_ind], bins=50)
-			p = (p/np.sum(p)) + eps
-			q, bins = np.histogram(cs[:,f_ind], bins=50)
-			q = (q/np.sum(q)) + eps
-			fkl[clabel, f_ind] = np.sum(np.where(p != 0, p * np.log(p / q), 0))
-	return fkl
-
-
-def get_wdistance_by_feature(ann1, ann2):
-	wdist = np.empty((len(annotations.classes), len(annotations.FEATS)),
-		dtype=np.float)
-	for c, cname in enumerate(annotations.classes):
-		for f, feat in enumerate(annotations.FEATS):
-			wdist[c, f] = wasserstein_distance(ann1[cname][:, f], ann2[cname][:, f])
-	return wdist
 
 
 def histogram(f):
@@ -117,9 +90,6 @@ def distance_summary(wdist_mu, odist_mu, aurocs, test_accs, net_names, axs, font
 	
 	ax1.legend(lines2 + lines + lines1, labels2 + labels + labels1, fontsize=fontsize-4, loc='upper left', frameon=False, ncol=3)
 	
-	
-	
-	
 
 
 def assess_pseudo_labeling(tag, SHAP, IDODS):
@@ -177,12 +147,12 @@ def estimate_marginals_from_shap(SHAPS, ANNS, os_ann, dim, draw_lims, savename, 
 			if f == 1 and clabel == 1 and (not overlap_ax is None):
 				overlap_ax.bar(bins2[:-1], p2, align="edge", width=np.diff(bins2), color='k', alpha=0.5, label=r'$P^+_{\mathcal{T}}$')
 				overlap_ax.bar(bins1[:-1], p1, align="edge", width=np.diff(bins1), color='red', alpha=0.5, label=r'$P_{\mathcal{S}}$')
-				overlap_ax.text(30, 0.175, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
-				overlap_ax.text(30, 0.150, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
+				overlap_ax.text(30, 0.275, r'$W^%d-%0.2f$' % (f+2, wdist[clabel, f]), fontsize=fontsize)
+				overlap_ax.text(30, 0.250, r'$V^%d-%0.2f$' % (f+2, odist[clabel, f]), fontsize=fontsize)
 				overlap_ax.set_title(annotations.FEATS[f], fontsize=fontsize)
 				overlap_ax.set_ylim(ylim)
 				overlap_ax.set_yticks(ylim)
-				overlap_ax.set_xlim([0, 60])
+				overlap_ax.set_xlim([0, 60])				
 				overlap_ax.tick_params(axis='both', which='major', labelsize=fontsize-4)
 
 			if '6' in feat: # == 'BR':
@@ -411,7 +381,7 @@ def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=
 		# 	xgboost.plot_tree(dtree, rankdir='LR', ax=dtree_ax[clabel])
 		# 	dtree_ax[clabel].set_title(cname, fontsize=fontsize)
 		SHAP 		= dtree.predict(xgboost.DMatrix(X, feature_names=annotations.FEATS), pred_contribs=True) #shap.TreeExplainer(dtree).shap_values(X)
-		axs[clabel, 0].set_ylabel(r'$\phi(Y^j|Y^1=%d)$' % clabel, fontsize=fontsize)
+		axs[clabel, 0].set_ylabel(r'$\phi(Y^j),Y^1=%d$' % clabel, fontsize=fontsize)
 		for f, feat in enumerate(annotations.FEATS):
 			x = X[feat]
 			y = SHAP[:,f]
@@ -455,98 +425,7 @@ def contribs_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=
 	plt.close()
 	return np.stack(ANNS), np.stack(SHAPS), np.stack(IDODS)
 
-
-def shap_by_feature(UNC, ANN, idod, savename, dtree_savename=None, fontsize=25, figsize=(30,15)):
-	SHAPS = []
-	ANNS  = []
-	IDODS = []
-	fig, axs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
-	dtree_fig, dtree_ax = plt.subplots(1, len(annotations.classes), figsize=(30, 30))
-	for cname in annotations.classes:
-		clabel 		= annotations.class_to_label_dict[cname]
-		cind   		= np.where(ANN[:,0] == clabel)[0]
-		X   		= pd.DataFrame(ANN[cind, 1:])
-		X.columns 	= annotations.FEATS
-		y   		= UNC[cind]				
-		dtree 		= xgboost.train({"learning_rate": 0.01}, xgboost.DMatrix(X, label=list(y), feature_names=annotations.FEATS), 100)
-		if not dtree_savename is None:
-			xgboost.plot_tree(dtree, rankdir='LR', ax=dtree_ax[clabel])
-			dtree_ax[clabel].set_title(cname, fontsize=fontsize)
-		SHAP 		= shap.TreeExplainer(dtree).shap_values(X)
-		axs[clabel, 0].set_ylabel(r'$Y^1=%d$' % clabel, fontsize=fontsize)
-		for f, feat in enumerate(annotations.FEATS):
-			axs[clabel, f].scatter(X[feat], SHAP[:,f])
-			axs[clabel, f].set_title(feat, fontsize=fontsize)
-			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-12)
-		ANNS.append(ANN[cind, 1:])
-		SHAPS.append(SHAP)
-		IDODS.append(idod[cind])
-	fig.savefig(savename, bbox_inches='tight')
-	if not dtree_savename is None:
-		dtree_fig.savefig(dtree_savename, dpi=300, bbox_inches='tight')
-	plt.close()
-	return np.stack(ANNS), np.stack(SHAPS), np.stack(IDODS)
-
-def estimated_id_features_using_shap(SHAPS, ANNS, dim, draw_lims, id_savename, od_savename, fontsize=20, figsize=(30,15)):
-	idfig, idaxs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
-	odfig, odaxs = plt.subplots(len(annotations.classes), len(annotations.FEATS), figsize=figsize)
-	for cname in annotations.classes:
-		clabel 	= annotations.class_to_label_dict[cname]
-		shap    = SHAPS[clabel]
-		ann     = ANNS[clabel]
-		for f, feat in enumerate(annotations.FEATS):
-			F  = ann[:, f]
-			S  = shap[:, f]
-			idF  = F[S >= 0]
-			hist, bins = np.histogram(idF, bins=15)
-			freq = hist/len(idF)
-			idaxs[clabel, f].bar(bins[:-1], freq, align="edge", width=np.diff(bins))
-			idaxs[clabel, f].set_ylim([0,1])
-			print('ID sum - %0.2f' % np.sum(freq))
-			# idaxs[clabel, f].hist(idF)
-			if feat == 'BR':
-				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
-				idaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//12])
-			else: #coordinates
-				f_spread = np.arange(0, dim + 1)
-				idaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//8])
-
-			odF  = F[S < 0]
-			hist, bins = np.histogram(odF, bins=15)
-			freq = hist/len(odF)
-			odaxs[clabel, f].bar(bins[:-1], freq, align="edge", width=np.diff(bins))
-			odaxs[clabel, f].set_ylim([0,1])
-			print('OD sum - %0.2f' % np.sum(freq))
-			# odaxs[clabel, f].hist(odF)
-			if feat == 'BR':
-				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
-				odaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//12])
-			else: #coordinates
-				f_spread = np.arange(0, dim + 1)
-				odaxs[clabel, f].set_xticks(f_spread[::len(f_spread)//8])
-
-	idfig.savefig(id_savename)
-	odfig.savefig(od_savename)
-	plt.close()
-
-def shap_summary(SHAP, ANN, net_name, axs, fontsize=20):	
-	for cname in annotations.classes:
-		clabel 	= annotations.class_to_label_dict[cname]
-		cind   	= np.where(ANN[:,0] == clabel)[0]
-		cANN    = ANN[cind, 1:]
-		shap 	= SHAP[clabel]
-		for f, feat in enumerate(annotations.FEATS):
-			F  = cANN[:, f]
-			S  = shap[:,f]				
-			uF = np.unique(F)	
-			mS = [S[F == f].mean() for f in uF]				
-			axs[clabel, f].plot(uF, mS, label=net_name)
-			if clabel == 0:
-				axs[clabel, f].set_title(feat, fontsize=fontsize)
-			if f == 0:
-				axs[clabel, f].set_ylabel(cname, fontsize=fontsize)
-	
-				
+			
 class TrainedModel:
 	def __init__(self, model, checkpoint_path, is_calibrated=False):
 		checkpoint = torch.load(checkpoint_path)
@@ -626,28 +505,7 @@ class TrainedModel:
 		ax2.tick_params(axis='both', which='major', labelsize=fontsize-4)
 		fig.savefig(savename, bbox_inches='tight')
 
-	# def plot_inout_score_distributions(self, PRD, idod, T, savename, fontsize=20, figsize=(30,15)):
-	# 	id_ind = np.where(idod == annotations.id_label)[0]
-	# 	od_ind = np.where(idod == annotations.od_label)[0]
-	# 	fig, axs = plt.subplots(2, len(T), figsize=figsize)		
-	# 	mSFM  = np.max(PRD,axis=2)
-	# 	for i, t in enumerate(T):
-	# 		ax = axs[0, i]
-	# 		ax.hist(mSFM[i, id_ind], color='blue')
-	# 		ax.set_xlim([0.5,1])
-	# 		ax.set_title('T-%0.2f' % t, fontsize=fontsize)
-	# 		mse_id = np.square(1.0 - mSFM[i,id_ind]).mean()
-	# 		ax.set_xlabel('MSE-%0.3f' % mse_id, fontsize=fontsize)
-
-	# 		ax = axs[1, i]
-	# 		ax.hist(mSFM[i, od_ind], color='red')
-	# 		ax.set_xlim([0.5,1])
-	# 		mse_od = np.square(mSFM[i,od_ind] - 0.5).mean()
-	# 		ax.set_xlabel('MSE-%0.3f' % mse_od, fontsize=fontsize)
-	# 	fig.savefig(savename)
-
 	
-
 	def evaluate(self, device, criterion, loader, eps, T, var=1, y_ann=None):
 		self.model.to(device)
 		self.model.eval()
