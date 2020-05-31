@@ -9,4 +9,5 @@ This repository contains the code and data which can reproduce results reported 
 python run_test.py --test_config=config/test_draw_128.py
 ```
 This will prompt the user to place source data files from Quick,Draw! with Google (https://quickdraw.withgoogle.com/data)
-4. To use pre-trained models and previously collected data, download this file and untar it to SpecCheck/_tests
+
+4. To use pre-trained models and previously collected data, download this file and untar it to SpecCheck/_tests, before running the same command
