@@ -1,5 +1,5 @@
 # SpecCheck
-This repository contains the code and data which can reproduce results reported in our article 'Does the data meet your expectations? Explaining bias in a dataset' submitted to NeurIPS 2020. Briefly, the idea is to explain sample representation and bias in a dataset of greyscale images of circles and squares in terms of intuitive aspects such as size, position and pixel brightness.
+This repository contains the code and data which can reproduce results reported in our article 'Does the data meet your expectations? Explaining bias in a dataset' submitted to BNAIC 2020. Briefly, the idea is to explain sample representation in a dataset of greyscale images of circles and squares in terms of intuitive aspects such as size, position and pixel brightness.
 
 ## Demo
 1. Make sure to install dependencies listed in requirements.txt
