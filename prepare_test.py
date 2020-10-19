@@ -20,11 +20,11 @@ def overlap_metric_example(savename):
 	lower_xplot_limit_orange = -0.25
 	upper_xplot_limit_orange = 7.5
 
-	blue_plot_limits = [(-5,-1), (-2,2), (1,5), (-3,9)]
+	blue_plot_limits = [(-5,-1), (-0.25,7.5), (1,5), (-3,9)]
 	plot_ind = [(0,0), (0,1), (1,0), (1,1)]
-	V_dists = [1, 0.76, -0.48, 0.35]
+	V_dists = [1, 0, -0.48, 0.35]
 	fig, ax = plt.subplots(2, 2, figsize=(12, 6))
-	titles = ['No overlap', 'Partial overlap', 'Containment', 'Partial overlap']
+	titles = ['No overlap', 'Perfect overlap', 'Containment', 'Partial overlap']
 	for idx, blue_limits in enumerate(blue_plot_limits):
 		lower_xplot_limit_blue = blue_limits[0]
 		upper_xplot_limit_blue = blue_limits[1]
@@ -103,7 +103,7 @@ def sources_available(sources,sources_url):
 			print('%s to %s' %(src_name,src_path))
 	return srcs_present
 
-def sample_dataset(root, savename, ann=None):
+def sample_dataset(root, savename, ann=None, draw_bbox=False):
 	def as_rows_and_cols(imgs,r,c):
 		assert(r*c == imgs.shape[0])
 		nchannels = imgs.shape[-1]
@@ -129,7 +129,7 @@ def sample_dataset(root, savename, ann=None):
 	else:
 		ann = annotations.get_annotations_for_batch(fnames,ann)
 		annotations.plot_samples(batch_imgs,
-				savename, labels=ann.reshape(r,c,-1), fontsize=20)
+				savename, labels=ann.reshape(r,c,-1), fontsize=20, draw_bbox=draw_bbox)
 
 def prepare_observed_set(cfg, dim, num_classes, test_root, sources):
 	qd_root = test_root/cfg['root']
@@ -142,7 +142,8 @@ def prepare_observed_set(cfg, dim, num_classes, test_root, sources):
 	qd_shapes = QuickDraw(qd_root,dim,
 			source_paths,cfg['imgs_per_class'],
 			cfg['min_sz'])
-	sample_dataset(qd_root, qd_root/'qd_samples.pdf')
+	qd_ann = np.load(qd_root/'labels.npy')
+	sample_dataset(qd_root, qd_root/'qd_samples.pdf', ann=qd_ann, draw_bbox=True)
 
 def prepare_coverage_set(cfg, dim, num_classes, test_root):
 	sd_root = test_root/cfg['root']

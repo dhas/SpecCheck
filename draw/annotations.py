@@ -30,7 +30,7 @@ ANNS   = ['CL', 'XMIN', 'YMIN', 'XMAX', 'YMAX', 'BR']
 FEATS  = [r'$Y^2$', r'$Y^3$', r'$Y^4$', r'$Y^5$', r'$Y^6$']
 	
 
-def plot_samples(imgs,savename, labels=None, size=(16,8), fontsize=16):
+def plot_samples(imgs,savename, labels=None, draw_bbox=False, size=(16,8), fontsize=16):
 	r = imgs.shape[0]
 	c = imgs.shape[1]	
 	show_xy = False
@@ -55,13 +55,14 @@ def plot_samples(imgs,savename, labels=None, size=(16,8), fontsize=16):
 					show_xy = True
 					ax.set_title('%s' % (','.join(['%d' % l for l in labels[i][j]])),
 						fontsize=fontsize)
-					# bbox = labels[i][j]
-					# x_min,y_min = bbox[1], bbox[2]
-					# x_max,y_max = bbox[3], bbox[4]
-					# ax.plot([x_min,x_min],[y_min,y_max],color='red')
-					# ax.plot([x_min,x_max],[y_min,y_min],color='red')
-					# ax.plot([x_max,x_max],[y_min,y_max],color='red')
-					# ax.plot([x_min,x_max],[y_max,y_max],color='red')
+					if draw_bbox:
+						bbox = labels[i][j]
+						x_min,y_min = bbox[1], bbox[2]
+						x_max,y_max = bbox[3], bbox[4]
+						ax.plot([x_min,x_min],[y_min,y_max],color='red')
+						ax.plot([x_min,x_max],[y_min,y_min],color='red')
+						ax.plot([x_max,x_max],[y_min,y_max],color='red')
+						ax.plot([x_min,x_max],[y_max,y_max],color='red')
 					# fig_title = '%s, ANN-%s' % (class_to_label_dict, ANNS)
 			ax.axis('off')
 	# if show_xy:
@@ -181,6 +182,41 @@ def overlap_index(x, y):
 
 
 
+def plot_annotation_distribution(ANN1, label, draw_lims, dim, savename, color='red',labelpad=5, fontsize=26, figsize=(12,6)):
+	ANN1 = ANN1[~np.all(ANN1[:,1:] == 0, axis=1)]
+	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
+	for cname in class_to_label_dict:
+		clabel = class_to_label_dict[cname]
+		cANN1 = ANN1[ANN1[:,0] == clabel,1:]
+		for f, feat in enumerate(FEATS):
+			f1 = cANN1[:, f]
+			p1, bins = histogram(f1)
+			axs[clabel, f].bar(bins[:-1], p1, align="edge", width=np.diff(bins), color=color, alpha=0.5, label=label)
+			axs[clabel, f].set_ylim([0,0.7])
+			axs[clabel, f].tick_params(axis='both', which='major', labelsize=fontsize-8)
+			ylim = [0, 0.3]
+			axs[clabel, f].set_ylim(ylim)
+			if '6' in FEATS[f]: # == 'BR':
+				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
+				axs[clabel, f].set_xlim([100, 255])
+				axs[clabel, f].set_xticks([120, 200])				
+			else: #coordinates
+				f_spread = np.arange(0, dim + 1)
+				axs[clabel, f].set_xlim([0, 128])
+				axs[clabel, f].set_xticks([0, 80])
+			if f == 0:
+				axs[clabel, f].set_ylabel(r'$P(Y^j|Y^1=%d)$' % clabel, fontsize=fontsize-4)
+				axs[clabel, f].set_yticks(ylim)
+			else:
+				axs[clabel, f].set_yticks([])
+			if clabel == 0:
+				axs[clabel, f].set_title(FEATS[f], fontsize=fontsize-4)
+				axs[clabel, f].set_xticks([])
+	
+	axs[clabel, f-1].legend(bbox_to_anchor=(-0.1, 0.25), loc='lower left', fontsize=fontsize-4, frameon=False, borderaxespad=None)	
+	fig.savefig(savename, bbox_inches='tight')
+	plt.close()
+
 
 def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savename, labelpad=5, fontsize=26, figsize=(12,6)):
 	ANN1 = ANN1[~np.all(ANN1[:,1:] == 0, axis=1)]
@@ -235,54 +271,6 @@ def compare_annotation_distributions(ANN1, ANN2, labels, draw_lims, dim, savenam
 	fig.savefig(savename, bbox_inches='tight')
 	plt.close()
 	return wdist, odist
-
-def plot_annotation_distribution(ANN, draw_lims, dim, savename, wdist=None, fontsize=25, figsize=(30,10)):
-	ANN = ANN[~np.all(ANN[:,1:] == 0, axis=1)]
-	fig, axs = plt.subplots(len(class_to_label_dict), len(FEATS), figsize=figsize)
-	for cname in class_to_label_dict:
-		clabel = class_to_label_dict[cname]
-		cANN = ANN[ANN[:,0] == clabel,1:]		
-		for f_ind in range(len(FEATS)):
-			f = cANN[:, f_ind]
-			ax = axs[clabel,f_ind]
-			hist, bins = np.histogram(f, bins=15)
-			freq = hist/np.sum(hist)
-			if wdist is None:
-				ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins))
-			else:
-				ax.bar(bins[:-1], freq, align="edge", width=np.diff(bins), label='wdist-%0.2f' % wdist[clabel, f_ind])
-			ax.set_ylim([0,1])
-			# ax.hist(f, bins=30)
-			# if FEATS[f_ind] == 'SZ':
-			# 	if cname == 'circle':
-			# 		f_spread = np.arange(draw_lims['sz_lo'], draw_lims['sz_hi'] + 1)					
-			# 		if len(f_spread) > 8:
-			# 			ax.set_xticks(f_spread[::len(f_spread)//8])
-			# 		else:
-			# 			ax.set_xticks(f_spread)
-			# 	else:
-			# 		f_spread = np.arange(draw_lims['sz_lo'], 2*draw_lims['sz_hi'] + 1)
-			# 		ax.set_xticks(f_spread[::len(f_spread)//16])			
-			if FEATS[f_ind] == 'BR':
-				f_spread = np.arange(draw_lims['br_lo'], draw_lims['br_hi'] + 1)
-				ax.set_xticks(f_spread[::len(f_spread)//12])
-			else: #coordinates
-				f_spread = np.arange(0, dim + 1)
-				ax.set_xticks(f_spread[::len(f_spread)//8])
-				# if cname == 'circle':
-				# 	f_spread = np.arange(0, dim + 1)
-				# 	ax.set_xticks(f_spread[::len(f_spread)//8])
-				# else:
-				# 	f_spread = np.arange(0, (dim - draw_lims['sz_lo']) + 1)
-				# 	ax.set_xticks(f_spread[::len(f_spread)//16])
-
-			if f_ind == 0:
-				ax.set_ylabel(cname, fontsize=fontsize)
-			if clabel == 0:
-				ax.set_title(FEATS[f_ind], fontsize=fontsize)
-			ax.legend(fontsize=fontsize-4, loc='upper right')
-	fig.savefig(savename, bbox_inches='tight')
-	plt.close()
 
 def annotations_list2dict(ann):
 	d = dict.fromkeys(classes)
